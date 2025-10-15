@@ -1,5 +1,9 @@
 package com.billing.service;
 
-public class BillingService {
+import com.billing.dto.HospitalDTO;
+import com.billing.dto.PatientDTO;
 
+public interface BillingService {
+	
+	void registerPatientAdmission(PatientDTO patient, HospitalDTO hospital);
 }
