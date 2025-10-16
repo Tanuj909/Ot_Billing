@@ -63,6 +63,7 @@ public class IPDSeriviceImpl implements IPDBillingService{
         billingMasterRepository.save(billingMaster);
 		// TODO Auto-generated method stub
         
+        
         //5. Save the Billing in IPD
         IPDBillingDetails details = new IPDBillingDetails();
         details.setBillingMaster(billingMaster);
@@ -76,7 +77,7 @@ public class IPDSeriviceImpl implements IPDBillingService{
         details.setMiscellaneousCharges(request.getMiscellaneousCharges());
         details.setDaysAdmitted(daysAdmitted);
         details.setTotal(total);
-        
+      
 		return ipdBillingRepository.save(details);
 	}
 	

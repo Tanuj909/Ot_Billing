@@ -29,7 +29,7 @@ public class BillingController {
     @PostMapping("/register-admission")
     public ResponseEntity<String> registerPatientAdmission(
             @RequestBody PatientAdmissionRequest request) {
-        billingService.registerPatientAdmission(request.getPatient(), request.getHospital());
+        billingService.registerPatientAdmission(request.getPatient(), request.getHospital(), request.getModuleType());
         return ResponseEntity.ok("Patient admission registered successfully");
     }
 

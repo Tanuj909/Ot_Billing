@@ -5,5 +5,5 @@ import com.billing.dto.PatientDTO;
 
 public interface BillingService {
 	
-	void registerPatientAdmission(PatientDTO patient, HospitalDTO hospital);
+	void registerPatientAdmission(PatientDTO patient, HospitalDTO hospital, String moduleType);
 }

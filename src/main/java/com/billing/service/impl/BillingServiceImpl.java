@@ -2,6 +2,7 @@ package com.billing.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 import com.billing.dto.HospitalDTO;
 import com.billing.dto.PatientDTO;
@@ -21,11 +22,12 @@ public class BillingServiceImpl implements BillingService {
 	
 	private final HospitalRepository hospitalRepository;
 	private final PatientRepository patientRepository;
-	private final ModuleMappingRepository moudleMappingRepository;
+	private final ModuleMappingRepository moduleMappingRepository;
 	
 	@Override
+	
 	@Transactional
-	public void registerPatientAdmission(PatientDTO patientDto, HospitalDTO hospitalDto) {
+	public void registerPatientAdmission(PatientDTO patientDto, HospitalDTO hospitalDto, String moduleType) {
 		//Checking if the Hospital exists
 		  Hospital hospital = hospitalRepository.findByExternalId(hospitalDto.getExternalId())
 		            .orElseGet(() -> {
@@ -55,17 +57,17 @@ public class BillingServiceImpl implements BillingService {
 		    }
 	
 		    
-		    
 		    //check if module Mapping Exists!
-//		   Optional<ModuleMapping> existingModuleMapping = moudleMappingRepository.findByHospitalAndModuleType(hospitalDto.getExternalId());
-//		    if(existingModuleMapping.isEmpty()) {
-//		    	ModuleMapping mapping = new ModuleMapping();
-//		    	mapping.setHospital(hospital);
-//                mapping.setFirstSeenAt(LocalDateTime.now());
-//                mapping.setCount(0);
-//		    	moudleMappingRepository.save(mapping);
-//		    	
-//		    }
+		   Optional<ModuleMapping> existingModuleMapping = moduleMappingRepository.findByHospitalIdAndModuleType(hospitalDto.getExternalId(), moduleType);
+		    if(existingModuleMapping.isEmpty()) {
+		    	ModuleMapping mapping = new ModuleMapping();
+		    	mapping.setHospital(hospital);
+                mapping.setFirstSeenAt(LocalDateTime.now());
+                mapping.setModuleType(moduleType);
+                mapping.setCount(0);
+		    	moduleMappingRepository.save(mapping);
+		    	
+		    }
 		    
 		    //check if module Mapping Exists!
 //		   Optional<ModuleMapping> existingModuleMapping = moudleMappingRepository.findByHospitalAndModuleType(hospitalDto.getExternalId(), moduleType);
