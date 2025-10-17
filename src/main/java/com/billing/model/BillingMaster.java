@@ -3,7 +3,11 @@ package com.billing.model;
 
 import java.time.LocalDateTime;
 
+import com.billing.enums.PaymentStatus;
+
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -37,7 +41,11 @@ public class BillingMaster {
 	
 	private String moduleType;
 	private double totalAmount;
-	private String status;
+	
+	//You need to tell JPA to store the enum as a string.
+	//Otherwise it will store it as 0,1,2 in according the sequence you have mentioned enum in the class
+	@Enumerated(EnumType.STRING)
+	private PaymentStatus paymentStatus;
 	
 	private LocalDateTime billingDate = LocalDateTime.now();
 }

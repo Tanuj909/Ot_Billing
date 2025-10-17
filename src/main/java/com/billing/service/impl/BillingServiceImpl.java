@@ -31,11 +31,11 @@ public class BillingServiceImpl implements BillingService {
 		//Checking if the Hospital exists
 		  Hospital hospital = hospitalRepository.findByExternalId(hospitalDto.getExternalId())
 		            .orElseGet(() -> {
-		                Hospital h = new Hospital();
-		                h.setExternalId(hospitalDto.getExternalId());
-		                h.setName(hospitalDto.getName());
-		                h.setEmail(hospitalDto.getEmail());
-		                return hospitalRepository.save(h);
+		                Hospital newHospital = new Hospital();
+		                newHospital.setExternalId(hospitalDto.getExternalId());
+		                newHospital.setName(hospitalDto.getName());
+		                newHospital.setEmail(hospitalDto.getEmail());
+		                return hospitalRepository.save(newHospital);
 		            });
 		 
 		 

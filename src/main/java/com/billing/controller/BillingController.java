@@ -25,7 +25,6 @@ public class BillingController {
 	  @Autowired
 	  private BillingService billingService;
 
-	
     @PostMapping("/register-admission")
     public ResponseEntity<String> registerPatientAdmission(
             @RequestBody PatientAdmissionRequest request) {
@@ -33,7 +32,6 @@ public class BillingController {
         return ResponseEntity.ok("Patient admission registered successfully");
     }
 
-    
 	@PostMapping("ipd/generate-bill")
 	public ResponseEntity<IPDBillingDetails> generateIPDBill(@RequestBody IpdBillRequestDTO request)
 	{

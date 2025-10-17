@@ -59,6 +59,7 @@ public class IPDSeriviceImpl implements IPDBillingService{
         billingMaster.setHospital(hospital);
         billingMaster.setPatient(patient);
         billingMaster.setModuleType("IPD");
+        billingMaster.setPaymentStatus(request.getPaymentStatus());
         billingMaster.setTotalAmount(total);
         billingMasterRepository.save(billingMaster);
 		// TODO Auto-generated method stub

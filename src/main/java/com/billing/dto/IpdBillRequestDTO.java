@@ -3,6 +3,8 @@ package com.billing.dto;
 import lombok.Data;
 import java.time.LocalDate;
 
+import com.billing.enums.PaymentStatus;
+
 @Data
 public class IpdBillRequestDTO {
     private Long patientExternalId;
@@ -18,4 +20,5 @@ public class IpdBillRequestDTO {
     private Double foodCharges;
     private Long daysAdmitted;
     private Double miscellaneousCharges;
+    private PaymentStatus paymentStatus;
 }
