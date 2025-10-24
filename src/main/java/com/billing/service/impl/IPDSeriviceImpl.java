@@ -32,14 +32,14 @@ public class IPDSeriviceImpl implements IPDBillingService{
 	@Override
 	public IPDBillingDetails generateIpdBill(IpdBillRequestDTO request) {
 		
-		 // 1️ Fetch patient & hospital by externalId
+		// 1️. Fetch patient & hospital by externalId
         Patient patient = patientRepository.findByExternalId(request.getPatientExternalId());
 //                .orElseThrow(() -> new RuntimeException("Patient not found"));
         
         Hospital hospital = hospitalRepository.findByExternalId(request.getHospitalExternalId())
                 .orElseThrow(() -> new RuntimeException("Hospital not found"));
         
-        // 2️ Calculate days admitted
+        // 2️. Calculate days admitted
 //        long daysAdmitted = ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1;
         long daysAdmitted = Math.max(1, ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1);
 
@@ -53,6 +53,7 @@ public class IPDSeriviceImpl implements IPDBillingService{
         double total  = roomCharges + medicationCharges + request.getNursingCharges()+ 
         		request.getDoctorFee()+ request.getDiagnosticCharges()+
         		request.getFoodCharges()+ request.getMiscellaneousCharges();
+        
         
         //4. Save The Billing Total 
         BillingMaster billingMaster = new BillingMaster();
@@ -73,14 +74,13 @@ public class IPDSeriviceImpl implements IPDBillingService{
         details.setMedicationCharges(request.getMedicationCharges());
         details.setNursingCharges(request.getNursingCharges());
         details.setDiagnosticCharges(request.getDiagnosticCharges());
-//        details.setOtCharges(request.getOtCharges());
+//      details.setOtCharges(request.getOtCharges());
         details.setFoodCharges(request.getFoodCharges());
         details.setMiscellaneousCharges(request.getMiscellaneousCharges());
         details.setDaysAdmitted(daysAdmitted);
         details.setTotal(total);
-      
+        
 		return ipdBillingRepository.save(details);
 	}
-	
 
 }

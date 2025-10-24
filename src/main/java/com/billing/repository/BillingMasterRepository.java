@@ -1,9 +1,36 @@
 package com.billing.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.billing.enums.PaymentStatus;
 import com.billing.model.BillingMaster;
 
 public interface BillingMasterRepository extends JpaRepository<BillingMaster, Long> {
+	
+	List<BillingMaster> findByPatient_Id(Long patientId);
+	
+	List<BillingMaster> findByHospital_Id(Long hospitalId);
+	
+	@Query("SELECT SUM(b.totalAmount) FROM BillingMaster b WHERE b.hospital.id = :hospitalId")
+	Double getTotalBillingByHospitalId(@Param("hospitalId") Long hospitalId);
+	
+	@Query("SELECT b FROM BillingMaster b WHERE b.hospital.id = :hospitalId AND b.paymentStatus = :status")
+	List<BillingMaster> findBillingByHospitalIdAndPaymentStatus(
+	        @Param("hospitalId") Long hospitalId,
+	        @Param("status") PaymentStatus status);
+	
+	
+//	@Query("SELECT b FROM BillingMaster b WHERE b.hospital.id = :hospitalId AND b.moduleType = :moduleType")
+//	List<BillingMaster> findBillingByHospitalIdAndModuleType(
+//			@Param("hospitalId") Long hospitalId,
+//			@Param("moduleType") String moduleType
+//			);
+
+
+	
 
 }

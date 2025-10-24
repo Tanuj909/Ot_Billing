@@ -25,7 +25,6 @@ public class BillingServiceImpl implements BillingService {
 	private final ModuleMappingRepository moduleMappingRepository;
 	
 	@Override
-	
 	@Transactional
 	public void registerPatientAdmission(PatientDTO patientDto, HospitalDTO hospitalDto, String moduleType) {
 		//Checking if the Hospital exists
