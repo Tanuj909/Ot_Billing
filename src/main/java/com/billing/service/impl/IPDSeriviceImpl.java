@@ -1,3 +1,4 @@
+
 package com.billing.service.impl;
 
 import java.time.temporal.ChronoUnit;
@@ -32,12 +33,15 @@ public class IPDSeriviceImpl implements IPDBillingService{
 	@Override
 	public IPDBillingDetails generateIpdBill(IpdBillRequestDTO request) {
 		
+		//Ye jo niche patient and hospital hai ye abhi Patient & Hospital type kai hai, 
+		//inhea tujhea Long ka type ka krna hoga IPD mai use krne sai phle
+		
 		// 1️. Fetch patient & hospital by externalId
-        Patient patient = patientRepository.findByExternalId(request.getPatientExternalId());
-//                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        Patient patient = patientRepository.findByExternalId(request.getPatientExternalId())
+                .orElseThrow(() -> new RuntimeException("Patient not found")); //Ye line work kre aur humare pass ye error(Type mismatch: cannot convert from Optional<Patient> to Patient) na aye isiliye hum patient repo mai Optional method banenge! 
         
         Hospital hospital = hospitalRepository.findByExternalId(request.getHospitalExternalId())
-                .orElseThrow(() -> new RuntimeException("Hospital not found"));
+                .orElseThrow(() -> new RuntimeException("Hospital not found")); //Ye line work kre aur humare pass ye error(Type mismatch: cannot convert from Optional<Hospital> to Hospital) na aye isiliye hum hospital repo mai Optional method banenge! 
         
         // 2️. Calculate days admitted
 //        long daysAdmitted = ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1;

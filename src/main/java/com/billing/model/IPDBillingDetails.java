@@ -29,7 +29,6 @@ public class IPDBillingDetails {
 	@OneToOne
 	@JoinColumn(name = "billing_id")
 	private BillingMaster billingMaster;
-	
     private Double roomCharges;
     private Double medicationCharges;
     private Double doctorFees;

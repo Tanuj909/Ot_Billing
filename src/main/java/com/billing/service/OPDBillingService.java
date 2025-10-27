@@ -1,5 +1,10 @@
 package com.billing.service;
 
-public class OPDBillingService {
+import com.billing.dto.OpdBillRequestDTO;
+import com.billing.model.OPDBillingDetails;
 
+public interface OPDBillingService {
+	
+	OPDBillingDetails generateOpdBilling(OpdBillRequestDTO request);
+	
 }

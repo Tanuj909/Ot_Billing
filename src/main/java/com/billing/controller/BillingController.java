@@ -12,13 +12,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.billing.dto.IpdBillRequestDTO;
+import com.billing.dto.OpdBillRequestDTO;
 import com.billing.dto.PatientAdmissionRequest;
 import com.billing.enums.PaymentStatus;
 import com.billing.model.BillingMaster;
 import com.billing.model.IPDBillingDetails;
+import com.billing.model.OPDBillingDetails;
 import com.billing.service.BillingService;
 import com.billing.service.HospitalBillingService;
 import com.billing.service.IPDBillingService;
+import com.billing.service.OPDBillingService;
 import com.billing.service.PatientBillingService;
 
 @RestController
@@ -27,6 +30,9 @@ public class BillingController {
 	
 	  @Autowired
 	  private IPDBillingService ipdBillingService;
+	  
+	  @Autowired
+	  private OPDBillingService opdBillingService;
 	  
 	  @Autowired
 	  private BillingService billingService;
@@ -48,6 +54,11 @@ public class BillingController {
 	@PostMapping("ipd/generate-bill")
 	public ResponseEntity<IPDBillingDetails> generateIPDBill(@RequestBody IpdBillRequestDTO request){
 		return ResponseEntity.ok(ipdBillingService.generateIpdBill(request));
+	}
+	
+	@PostMapping("/opd/generate-bill")
+	public ResponseEntity<OPDBillingDetails> generateOPDBill(@RequestBody OpdBillRequestDTO request){
+		return ResponseEntity.ok(opdBillingService.generateOpdBilling(request));
 	}
 	
 	//Get the Billing of the patient(Will give list if there more than one)
@@ -74,11 +85,22 @@ public class BillingController {
 		return hospitalBillingService.findBillingByPayment_Status(hospitalId, status);
 	}
 	
-	//Get the Billing with Module Type
+//	//Get the Billing with Module Type
 //	@GetMapping("/moduleType")
-//	public List<BillingMaster> getBillingByStatus(@RequestParam Long hospitalId, @RequestParam String moduleType){
+//	public List<BillingMaster> getBillingByModule(
+//			@RequestParam Long hospitalId, @RequestParam String moduleType){
+//		
 //		return hospitalBillingService.findBillingByModuleType(hospitalId, moduleType);
 //	}
+	
+	@GetMapping("hospital/{hospitalId}/module/{moduleType}")
+	public List<BillingMaster> getBillingByModule(
+			  @PathVariable Long hospitalId,
+		       @PathVariable String moduleType){
+		
+		return hospitalBillingService.findBillingByModuleType(hospitalId, moduleType);
+	}
+	
 	
 	
 }

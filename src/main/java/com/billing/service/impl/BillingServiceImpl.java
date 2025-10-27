@@ -39,7 +39,8 @@ public class BillingServiceImpl implements BillingService {
 		 
 		 
 		    // Check if patient exists
-		    Patient existingPatient = patientRepository.findByExternalId(patientDto.getExternalId());
+		    Patient existingPatient = patientRepository.findByExternalId(patientDto.getExternalId())
+		    		.orElseThrow(()-> new RuntimeException("Patient not found"));
 		    Patient billingPatient;
 		    
 		    if (existingPatient == null) {

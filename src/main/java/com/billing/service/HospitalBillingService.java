@@ -16,6 +16,6 @@ public interface HospitalBillingService {
 	List<BillingMaster> findBillingByPayment_Status(Long hospitalId, PaymentStatus paymentStatus);
 	
 	//Method to get the Bills by Module Type
-//	List<BillingMaster> findBillingByModuleType(Long hospitalId, String moduleType);
+	List<BillingMaster> findBillingByModuleType(Long hospitalId, String moduleType);
 
 }

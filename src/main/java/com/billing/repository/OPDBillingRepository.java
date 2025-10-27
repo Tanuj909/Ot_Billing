@@ -1,5 +1,9 @@
 package com.billing.repository;
 
-public interface OPDBillingRepository {
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.billing.model.OPDBillingDetails;
+
+public interface OPDBillingRepository extends JpaRepository<OPDBillingDetails, Long>{
 
 }
