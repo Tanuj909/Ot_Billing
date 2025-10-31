@@ -1,5 +1,7 @@
 package com.billing.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -28,7 +30,10 @@ public class IPDBillingDetails {
 	
 	@OneToOne
 	@JoinColumn(name = "billing_id")
+	@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 	private BillingMaster billingMaster;
+	
+	private Long admissionId;
     private Double roomCharges;
     private Double medicationCharges;
     private Double doctorFees;

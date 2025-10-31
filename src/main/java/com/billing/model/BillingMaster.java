@@ -3,6 +3,7 @@ package com.billing.model;
 
 import java.time.LocalDateTime;
 
+import com.billing.enums.PaymentMode;
 import com.billing.enums.PaymentStatus;
 
 import jakarta.persistence.Entity;
@@ -31,13 +32,19 @@ public class BillingMaster {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 	
-	@ManyToOne
-	@JoinColumn(name = "hospital_id")
-	private Hospital hospital;
+//	@ManyToOne
+//	@JoinColumn(name = "hospital_id")
+//	private Hospital hospital;
 	
-	@ManyToOne
-	@JoinColumn(name = "patient_id")
-	private Patient patient;
+	private Long hospitaExternallId;
+	
+	private Long patientExternalId;
+	
+	private Long admissionId;
+	
+//	@ManyToOne
+//	@JoinColumn(name = "patient_id")
+//	private Patient patient;
 	
 	private String moduleType;
 	private double totalAmount;
@@ -46,6 +53,9 @@ public class BillingMaster {
 	//Otherwise it will store it as 0,1,2 in according the sequence you have mentioned enum in the class
 	@Enumerated(EnumType.STRING)
 	private PaymentStatus paymentStatus;
+	
+	@Enumerated(EnumType.STRING)
+	private PaymentMode paymentMode;
 	
 	private LocalDateTime billingDate = LocalDateTime.now();
 }

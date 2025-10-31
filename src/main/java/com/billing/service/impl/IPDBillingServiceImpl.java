@@ -3,8 +3,13 @@ package com.billing.service.impl;
 
 import java.time.temporal.ChronoUnit;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.config.ConfigDataResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
 import com.billing.dto.IpdBillRequestDTO;
+import com.billing.dto.IpdPaymentRequestDTO;
+import com.billing.enums.PaymentStatus;
 import com.billing.model.BillingMaster;
 import com.billing.model.Hospital;
 import com.billing.model.IPDBillingDetails;
@@ -16,7 +21,7 @@ import com.billing.repository.PatientRepository;
 import com.billing.service.IPDBillingService;
 
 @Service
-public class IPDSeriviceImpl implements IPDBillingService{
+public class IPDBillingServiceImpl implements IPDBillingService{
 	
 	@Autowired
 	private  IPDBillingRepository ipdBillingRepository;
@@ -29,6 +34,9 @@ public class IPDSeriviceImpl implements IPDBillingService{
 	
 	@Autowired
 	private  PatientRepository patientRepository;
+	
+	@Autowired
+	private RestTemplate restTemplate;
 
 	@Override
 	public IPDBillingDetails generateIpdBill(IpdBillRequestDTO request) {
@@ -37,11 +45,11 @@ public class IPDSeriviceImpl implements IPDBillingService{
 		//inhea tujhea Long ka type ka krna hoga IPD mai use krne sai phle
 		
 		// 1️. Fetch patient & hospital by externalId
-        Patient patient = patientRepository.findByExternalId(request.getPatientExternalId())
-                .orElseThrow(() -> new RuntimeException("Patient not found")); //Ye line work kre aur humare pass ye error(Type mismatch: cannot convert from Optional<Patient> to Patient) na aye isiliye hum patient repo mai Optional method banenge! 
-        
-        Hospital hospital = hospitalRepository.findByExternalId(request.getHospitalExternalId())
-                .orElseThrow(() -> new RuntimeException("Hospital not found")); //Ye line work kre aur humare pass ye error(Type mismatch: cannot convert from Optional<Hospital> to Hospital) na aye isiliye hum hospital repo mai Optional method banenge! 
+//        Patient patient = patientRepository.findByExternalId(request.getPatientExternalId())
+//                .orElseThrow(() -> new RuntimeException("Patient not found")); //Ye line work kre aur humare pass ye error(Type mismatch: cannot convert from Optional<Patient> to Patient) na aye isiliye hum patient repo mai Optional method banenge! 
+//        
+//        Hospital hospital = hospitalRepository.findByExternalId(request.getHospitalExternalId())
+//                .orElseThrow(() -> new RuntimeException("Hospital not found")); //Ye line work kre aur humare pass ye error(Type mismatch: cannot convert from Optional<Hospital> to Hospital) na aye isiliye hum hospital repo mai Optional method banenge! 
         
         // 2️. Calculate days admitted
 //        long daysAdmitted = ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1;
@@ -61,10 +69,12 @@ public class IPDSeriviceImpl implements IPDBillingService{
         
         //4. Save The Billing Total 
         BillingMaster billingMaster = new BillingMaster();
-        billingMaster.setHospital(hospital);
-        billingMaster.setPatient(patient);
+        billingMaster.setHospitaExternallId(request.getHospitalExternalId());
+        billingMaster.setPatientExternalId(request.getPatientExternalId());
+        billingMaster.setAdmissionId(request.getAdmissionId());
         billingMaster.setModuleType("IPD");
-        billingMaster.setPaymentStatus(request.getPaymentStatus());
+//        billingMaster.setPaymentStatus(request.getPaymentStatus());
+        billingMaster.setPaymentStatus(PaymentStatus.PENDING);
         billingMaster.setTotalAmount(total);
         billingMasterRepository.save(billingMaster);
 		// TODO Auto-generated method stub
@@ -73,6 +83,7 @@ public class IPDSeriviceImpl implements IPDBillingService{
         //5. Save the Billing in IPD
         IPDBillingDetails details = new IPDBillingDetails();
         details.setBillingMaster(billingMaster);
+        details.setAdmissionId(request.getAdmissionId());
         details.setRoomCharges(roomCharges);
         details.setDoctorFees(request.getDoctorFee());
         details.setMedicationCharges(request.getMedicationCharges());
@@ -86,5 +97,40 @@ public class IPDSeriviceImpl implements IPDBillingService{
         
 		return ipdBillingRepository.save(details);
 	}
+
+	@Override
+	public String processPayment(IpdPaymentRequestDTO request) {
+		
+		BillingMaster billingMaster = billingMasterRepository.findByAdmissionId(request.getAdmissionId())
+				.orElseThrow(()-> new RuntimeException("Billing not found!"));
+		
+//	    if ("PAID".equalsIgnoreCase(billingMaster.getPaymentStatus())) {
+//	        return "Payment already processed.";
+//	    }
+		
+		billingMaster.setPaymentStatus(PaymentStatus.PAID);
+		billingMaster.setPaymentMode(request.getPaymentMode());
+//		billingMaster.set
+		billingMasterRepository.save(billingMaster);
+		
+	       // 3️⃣ Call IPD API for Discharge
+//     String dischargeApiUrl = "http://localhost:8181/api/ipd/discharge-patient?admissionId=" + request.getAdmissionId();
+//     restTemplate.postForEntity(dischargeApiUrl, null, String.class);
+     
+//		return "Payment Done!";
+		  return "Payment processed successfully for Admission ID: " + request.getAdmissionId();
+
+	}
+
+	@Override
+	public IPDBillingDetails getBillingDetailsByAdmissionId(Long admissionId) {
+		return ipdBillingRepository.findByAdmissionId(admissionId)
+                .orElseThrow(() -> new RuntimeException("No billing found for admission ID: " + admissionId));
+   
+	}
+
+
+	
+	
 
 }

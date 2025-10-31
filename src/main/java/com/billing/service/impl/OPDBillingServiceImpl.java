@@ -46,8 +46,8 @@ public class OPDBillingServiceImpl implements OPDBillingService
 		
 		
 		BillingMaster billingMaster = new BillingMaster();
-		billingMaster.setHospital(hospital);
-		billingMaster.setPatient(patient);
+		billingMaster.setHospitaExternallId(request.getHospitalExternalId());
+		billingMaster.setPatientExternalId(request.getPatientExternalId());
 		billingMaster.setModuleType("OPD");
 		billingMaster.setPaymentStatus(request.getPaymentStatus());
 		billingMaster.setTotalAmount(total);

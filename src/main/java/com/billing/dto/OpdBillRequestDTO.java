@@ -18,6 +18,4 @@ public class OpdBillRequestDTO {
 	private Double minorProcedure;
 	private Double total;
 	private PaymentStatus paymentStatus;
-
-    
 }
