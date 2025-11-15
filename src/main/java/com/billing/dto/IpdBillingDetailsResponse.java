@@ -1,6 +1,9 @@
 package com.billing.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+
+import com.billing.model.IPDServiceUsage;
 
 import lombok.Data;
 
@@ -19,6 +22,16 @@ public class IpdBillingDetailsResponse {
     private Double miscellaneousCharges;
     private Long daysAdmitted;
     private Double total;
+ // ADD NESTED DTO FIELDS
+    private Double discountPercentage;
+    private Double discountAmount;
+    private Double gstPercentage;
+    private Double gstAmount;
+    private Double totalBeforeDiscount;
+    private Double totalAfterDiscountAndGst;
+    private List<IPDServiceUsage> ipdServices;
+
+    // ADD GETTERS/SETTERS
 
     @Data
     public static class BillingMasterDTO {

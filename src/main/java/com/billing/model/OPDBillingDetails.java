@@ -1,7 +1,7 @@
 package com.billing.model;
 
 import java.time.LocalDate;
-
+import java.time.LocalDateTime;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -38,7 +38,11 @@ public class OPDBillingDetails {
 	
 	private Double total;
 	
-	private LocalDate visitDate;
+	private LocalDateTime visitDate;
+	
+	private Long appointmentId;
+	
+	private Long doctorId;
 	
 	@OneToOne
 	@JoinColumn(name = "billing_id")

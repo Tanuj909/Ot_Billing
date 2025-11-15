@@ -1,6 +1,5 @@
 package com.billing.model;
 
-
 import java.time.LocalDateTime;
 
 import com.billing.enums.PaymentMode;
@@ -41,6 +40,8 @@ public class BillingMaster {
 	private Long patientExternalId;
 	
 	private Long admissionId;
+	
+	private Long appointmentId;
 	
 //	@ManyToOne
 //	@JoinColumn(name = "patient_id")
