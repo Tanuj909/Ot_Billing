@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -52,7 +53,9 @@ public class IPDBillingDetails {
     private Double miscellaneousCharges;
     private Long daysAdmitted;
     private Double total;
-    private double serviceCharges;
+    
+    @Column(nullable = true)
+    private Double serviceCharges;
     
  // ADD THESE FIELDS
     private Double discountPercentage;

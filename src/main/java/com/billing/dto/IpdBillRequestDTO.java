@@ -40,16 +40,8 @@ public class IpdBillRequestDTO {
     private Double gstPercentage;
     
     private List<IPDServiceUsage> ipdService;
-    private List<IPDDoctorVisit> doctorVisits;
-    private List<IPDMedication> medications;
+//    private List<IPDDoctorVisit> doctorVisits;
+//    private List<IPDMedication> medications;
 
-//    // ADD GETTERS & SETTERS (or use Lombok @Getter @Setter)
-//    public Double getDiscountPercentage() { return discountPercentage; }
-//    public void setDiscountPercentage(Double discountPercentage) { this.discountPercentage = discountPercentage; }
-//    public Double getGstPercentage() { return gstPercentage; }
-//    public void setGstPercentage(Double gstPercentage) { this.gstPercentage = gstPercentage; }
-//	public double getProcedureCharges() {
-//		// TODO Auto-generated method stub
-//		return 0;
-//	}
+
 }

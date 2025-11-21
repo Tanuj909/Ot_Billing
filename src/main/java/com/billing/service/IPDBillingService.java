@@ -10,6 +10,8 @@ public interface IPDBillingService {
     // ── Core billing ─────────────────────────────────────
     IPDBillingDetails generateIpdBill(IpdBillRequestDTO request);
     IpdBillingDetailsResponse getBillingDetailsByAdmissionId(Long admissionId);
+ // ADD THIS METHOD
+//    IPDBillingDetails updateIpdBIll(IpdBillRequestDTO request);
     String processPayment(IpdPaymentRequestDTO request);
 
     // ── Granular charges (services, doctor visits, medicines) ─────
@@ -20,4 +22,7 @@ public interface IPDBillingService {
     List<IPDServiceUsage> getServicesByBillingId(Long ipdBillingId);
     List<IPDDoctorVisit> getDoctorVisitsByBillingId(Long ipdBillingId);
     List<IPDMedication> getMedicationsByBillingId(Long ipdBillingId);
+    
+ // NEW METHOD
+    IPDBillingDetails updateIpdBill(IpdBillUpdateRequestDTO request);
 }

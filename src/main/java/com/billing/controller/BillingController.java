@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.billing.dto.IpdBillGenerateRequestDTO;
 import com.billing.dto.IpdBillRequestDTO;
+import com.billing.dto.IpdBillUpdateRequestDTO;
 import com.billing.dto.IpdBillingDetailsResponse;
 import com.billing.dto.IpdPaymentRequestDTO;
 import com.billing.dto.OpdBillRequestDTO;
@@ -82,6 +83,13 @@ public class BillingController {
 	public ResponseEntity<IpdBillingDetailsResponse> getIPDBillingDetails(@PathVariable Long admissionId) {
 		IpdBillingDetailsResponse response = ipdBillingService.getBillingDetailsByAdmissionId(admissionId);
 	    return ResponseEntity.ok(response);
+	}
+	
+	// ADD THIS ENDPOINT
+	@PutMapping("/ipd/update-bill")
+	public ResponseEntity<IPDBillingDetails> updateIPDBill(@RequestBody IpdBillUpdateRequestDTO request) {
+	    IPDBillingDetails updated = ipdBillingService.updateIpdBill(request);
+	    return ResponseEntity.ok(updated);
 	}
 	
 //	OPD Controller---------------

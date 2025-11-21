@@ -11,6 +11,8 @@ import com.billing.model.*;
 import com.billing.repository.*;
 import com.billing.service.IPDBillingService;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class IPDBillingServiceImpl implements IPDBillingService {
 
@@ -72,6 +74,7 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         details.setDaysAdmitted(daysAdmitted);
         details.setTotalBeforeDiscount(totalBeforeDiscount);
         details.setDiscountPercentage(request.getDiscountPercentage());
+        details.setServiceCharges(0.0);
         details.setDiscountAmount(discountAmount);
         details.setTotalAfterDiscountAndGst(totalAfterDiscount);
         details.setGstPercentage(request.getGstPercentage());
@@ -137,19 +140,79 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 
         return response;
     }
+    
+    
+//    Update the billing
+    @Override
+    @Transactional
+    public IPDBillingDetails updateIpdBill(IpdBillUpdateRequestDTO request) {
+        IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(request.getAdmissionId())
+                .orElseThrow(() -> new RuntimeException("No billing found for admission ID: " + request.getAdmissionId()));
+
+        long daysAdmitted = Math.max(1, ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1);
+
+        // Recalculate daily charges
+        double roomCharges       = request.getRoomRatePerDay() * daysAdmitted;
+        double nursingCharges    = request.getNursingChargesPerDay() * daysAdmitted;
+        double foodCharges       = request.getFoodChargesPerDay() * daysAdmitted;
+        double diagnosticCharges = request.getDiagnosticChargesPerDay() * daysAdmitted;
+        double miscDailyCharges  = request.getMiscChargesPerDay() * daysAdmitted;
+
+        // Keep already accumulated one-time charges
+        double medicationCharges = billing.getMedicationCharges() != null ? billing.getMedicationCharges() : 0.0;
+        double doctorFees        = billing.getDoctorFees() != null ? billing.getDoctorFees() : 0.0;
+        double procedureCharges  = billing.getProcedureCharges() != null ? billing.getProcedureCharges() : 0.0;
+        double serviceCharges    = billing.getServiceCharges() != null ? billing.getServiceCharges() : 0.0;
+
+        double totalMisc = miscDailyCharges + serviceCharges + request.getExtraServiceCharges();
+
+        double totalBeforeDiscount = roomCharges +
+                medicationCharges + doctorFees + nursingCharges +
+                diagnosticCharges + procedureCharges + foodCharges + totalMisc;
+
+        double discountAmount = totalBeforeDiscount * (request.getDiscountPercentage() / 100.0);
+        double totalAfterDiscount = totalBeforeDiscount - discountAmount;
+        double gstAmount = totalAfterDiscount * (request.getGstPercentage() / 100.0);
+        double finalTotal = totalAfterDiscount + gstAmount;
+
+        // Update billing details
+        billing.setDaysAdmitted(daysAdmitted);
+        billing.setRoomCharges(roomCharges);
+        billing.setNursingCharges(nursingCharges);
+        billing.setFoodCharges(foodCharges);
+        billing.setDiagnosticCharges(diagnosticCharges);
+        billing.setMiscellaneousCharges(totalMisc);
+        billing.setProcedureCharges(procedureCharges);
+        billing.setMedicationCharges(medicationCharges);
+        billing.setDoctorFees(doctorFees);
+
+        billing.setTotalBeforeDiscount(totalBeforeDiscount);
+        billing.setDiscountAmount(discountAmount);
+        billing.setTotalAfterDiscountAndGst(totalAfterDiscount);
+        billing.setGstAmount(gstAmount);
+        billing.setTotal(finalTotal);
+
+        // Update master
+        BillingMaster master = billing.getBillingMaster();
+        if (master != null) {
+            master.setTotalAmount(finalTotal);
+            billingMasterRepository.save(master);
+        }
+
+        return ipdBillingRepository.save(billing);
+    }
 
     /* --------------------------------------------------------------
        2. GRANULAR CHARGES (services / doctor visits / medicines)
        -------------------------------------------------------------- */
     @Override
+    @Transactional
     public List<IPDServiceUsage> addServices(AddServicesRequest request) {
-    	
         IPDBillingDetails billing = ipdBillingRepository.findById(request.getIpdBillingId())
                 .orElseThrow(() -> new RuntimeException("IPD Billing not found"));
-        
 
         List<IPDServiceUsage> usages = request.getServices().stream().map(item -> {
-           Double total = item.getPrice() * item.getQuantity();
+            Double total = item.getPrice() * item.getQuantity();
             return IPDServiceUsage.builder()
                     .ipdBillingDetails(billing)
                     .serviceName(item.getServiceName())
@@ -159,15 +222,38 @@ public class IPDBillingServiceImpl implements IPDBillingService {
                     .serviceAddDate(LocalDateTime.now())
                     .build();
         }).toList();
-        
-        Double totalServiceCharges = request.getServices().stream()
+
+        double newServiceTotal = request.getServices().stream()
                 .mapToDouble(item -> item.getPrice() * item.getQuantity())
                 .sum();
-        
-        billing.setServiceCharges(billing.getServiceCharges() + totalServiceCharges );
-        billing.setTotal(billing.getTotal() + totalServiceCharges);
-        ipdBillingRepository.save(billing);
 
+        // Update service charges
+        double currentServiceCharges = billing.getServiceCharges() != null ? billing.getServiceCharges() : 0.0;
+        billing.setServiceCharges(currentServiceCharges + newServiceTotal);
+
+        // Re-calculate total
+        double oldTotalBeforeDiscount = billing.getTotalBeforeDiscount();
+        double newTotalBeforeDiscount = oldTotalBeforeDiscount + newServiceTotal;
+
+        double discountAmount = newTotalBeforeDiscount * (billing.getDiscountPercentage() / 100.0);
+        double totalAfterDiscount = newTotalBeforeDiscount - discountAmount;
+        double gstAmount = totalAfterDiscount * (billing.getGstPercentage() / 100.0);
+        double finalTotal = totalAfterDiscount + gstAmount;
+
+        billing.setTotalBeforeDiscount(newTotalBeforeDiscount);
+        billing.setDiscountAmount(discountAmount);
+        billing.setTotalAfterDiscountAndGst(totalAfterDiscount);
+        billing.setGstAmount(gstAmount);
+        billing.setTotal(finalTotal);
+
+        // Update BillingMaster
+        BillingMaster master = billing.getBillingMaster();
+        if (master != null) {
+            master.setTotalAmount(finalTotal);
+            billingMasterRepository.save(master);
+        }
+
+        ipdBillingRepository.save(billing);
         return ipdServiceUsageRepository.saveAll(usages);
     }
 
@@ -222,4 +308,11 @@ public class IPDBillingServiceImpl implements IPDBillingService {
     public List<IPDMedication> getMedicationsByBillingId(Long ipdBillingId) {
         return ipdMedicationRepository.findByIpdBillingDetailsId(ipdBillingId);
     }
+
+
+//	@Override
+//	public IPDBillingDetails updateIpdBIll(IpdBillRequestDTO request) {
+//		// TODO Auto-generated method stub
+//		return null;
+//	}
 }
