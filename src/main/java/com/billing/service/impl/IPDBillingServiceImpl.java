@@ -151,48 +151,56 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 
         long daysAdmitted = Math.max(1, ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1);
 
-        // Recalculate daily charges
-        double roomCharges       = request.getRoomRatePerDay() * daysAdmitted;
-        double nursingCharges    = request.getNursingChargesPerDay() * daysAdmitted;
-        double foodCharges       = request.getFoodChargesPerDay() * daysAdmitted;
+        // === RECALCULATE ALL DAILY CHARGES FRESH ===
+        double roomCharges = request.getRoomRatePerDay() * daysAdmitted;
+
+        double nursingCharges = request.getNursingChargesPerDay() * daysAdmitted;
+        double foodCharges = request.getFoodChargesPerDay() * daysAdmitted;
         double diagnosticCharges = request.getDiagnosticChargesPerDay() * daysAdmitted;
-        double miscDailyCharges  = request.getMiscChargesPerDay() * daysAdmitted;
+        double miscDailyCharges = request.getMiscChargesPerDay() * daysAdmitted;
 
-        // Keep already accumulated one-time charges
-        double medicationCharges = billing.getMedicationCharges() != null ? billing.getMedicationCharges() : 0.0;
-        double doctorFees        = billing.getDoctorFees() != null ? billing.getDoctorFees() : 0.0;
-        double procedureCharges  = billing.getProcedureCharges() != null ? billing.getProcedureCharges() : 0.0;
-        double serviceCharges    = billing.getServiceCharges() != null ? billing.getServiceCharges() : 0.0;
+        // === USE LATEST ACCUMULATED VALUES FROM REQUEST (NOT OLD DB VALUES!) ===
+        double medicationCharges = request.getMedicationCharges();
+        double doctorFees = request.getDoctorFee();                    // Now correct × days
+        double procedureCharges = request.getProcedureCharges();
+        double extraServiceCharges = request.getExtraServiceCharges(); // nursing + food + diag + misc extras
 
-        double totalMisc = miscDailyCharges + serviceCharges + request.getExtraServiceCharges();
+        double totalMisc = miscDailyCharges + extraServiceCharges;
 
         double totalBeforeDiscount = roomCharges +
-                medicationCharges + doctorFees + nursingCharges +
-                diagnosticCharges + procedureCharges + foodCharges + totalMisc;
+                medicationCharges +
+                doctorFees +
+                nursingCharges +
+                diagnosticCharges +
+                procedureCharges +
+                foodCharges +
+                totalMisc;
 
         double discountAmount = totalBeforeDiscount * (request.getDiscountPercentage() / 100.0);
         double totalAfterDiscount = totalBeforeDiscount - discountAmount;
         double gstAmount = totalAfterDiscount * (request.getGstPercentage() / 100.0);
         double finalTotal = totalAfterDiscount + gstAmount;
 
-        // Update billing details
+        // === UPDATE ALL FIELDS WITH FRESH VALUES ===
         billing.setDaysAdmitted(daysAdmitted);
         billing.setRoomCharges(roomCharges);
-        billing.setNursingCharges(nursingCharges);
-        billing.setFoodCharges(foodCharges);
-        billing.setDiagnosticCharges(diagnosticCharges);
-        billing.setMiscellaneousCharges(totalMisc);
-        billing.setProcedureCharges(procedureCharges);
         billing.setMedicationCharges(medicationCharges);
         billing.setDoctorFees(doctorFees);
+        billing.setNursingCharges(nursingCharges);
+        billing.setDiagnosticCharges(diagnosticCharges);
+        billing.setProcedureCharges(procedureCharges);
+        billing.setFoodCharges(foodCharges);
+        billing.setMiscellaneousCharges(totalMisc);
 
         billing.setTotalBeforeDiscount(totalBeforeDiscount);
         billing.setDiscountAmount(discountAmount);
         billing.setTotalAfterDiscountAndGst(totalAfterDiscount);
         billing.setGstAmount(gstAmount);
         billing.setTotal(finalTotal);
+        billing.setDiscountPercentage(request.getDiscountPercentage());
+        billing.setGstPercentage(request.getGstPercentage());
 
-        // Update master
+        // Update master total
         BillingMaster master = billing.getBillingMaster();
         if (master != null) {
             master.setTotalAmount(finalTotal);
