@@ -63,7 +63,7 @@ public class IPDBillingDetails {
     private Double gstPercentage;
     private Double gstAmount;
     private Double totalBeforeDiscount;
-    private Double totalAfterDiscountAndGst;  // final total
+    private Double totalAfterDiscountAndGst ;  // final total
 //    private Double payableAmount;
 
     

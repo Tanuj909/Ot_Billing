@@ -166,6 +166,10 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         double extraServiceCharges = request.getExtraServiceCharges(); // nursing + food + diag + misc extras
 
         double totalMisc = miscDailyCharges + extraServiceCharges;
+        
+     // === IMPORTANT: ADD EXISTING SERVICE CHARGES ===
+        double existingServiceCharges =
+                billing.getServiceCharges() != null ? billing.getServiceCharges() : 0.0;
 
         double totalBeforeDiscount = roomCharges +
                 medicationCharges +
@@ -174,7 +178,8 @@ public class IPDBillingServiceImpl implements IPDBillingService {
                 diagnosticCharges +
                 procedureCharges +
                 foodCharges +
-                totalMisc;
+                totalMisc +
+                existingServiceCharges;;
 
         double discountAmount = totalBeforeDiscount * (request.getDiscountPercentage() / 100.0);
         double totalAfterDiscount = totalBeforeDiscount - discountAmount;
