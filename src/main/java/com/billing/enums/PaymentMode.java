@@ -1,10 +1,11 @@
 package com.billing.enums;
 
 public enum PaymentMode {
-	CASH,
-	CARD,
+    CASH, 	
+    CARD,
     UPI,
     NET_BANKING,
     CHEQUE
+
 
 }

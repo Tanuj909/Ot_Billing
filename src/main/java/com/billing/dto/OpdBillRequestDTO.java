@@ -19,6 +19,7 @@ public class OpdBillRequestDTO {
 	private Double injection;
 	private Double minorProcedure;
 	private Double total;
+	private Double serviceCharges;
 	private PaymentStatus paymentStatus;
 	private PaymentMode paymentMode;
 }

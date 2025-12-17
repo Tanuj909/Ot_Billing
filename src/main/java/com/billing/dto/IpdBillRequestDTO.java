@@ -22,22 +22,40 @@ public class IpdBillRequestDTO {
 	private Long patientExternalId;
     private Long hospitalExternalId;
     private Long admissionId;
+    
     private LocalDate admissionDate;
     private LocalDate dischargeDate;
+    private Long daysAdmitted;
+    
+    
     private Double roomRatePerDay;
     private Double doctorFee;
     private Double medicationCharges;
     private double ProcedureCharges;
     private Double nursingCharges;
     private Double diagnosticCharges;
+
+    // =========================
+    // FOOD (SPLIT)
+    // =========================
     private Double foodCharges;
-    private Long daysAdmitted;
+    private Double patientFoodCharges;     // GST EXEMPT
+    private Double attendantFoodCharges;   // GST already calculated in gstAmount
+    
+    
     private Double miscellaneousCharges;
+    
     private PaymentStatus paymentStatus;
+    private Double advanceAmount;      // ← NEW, optional
+    private String advancePaymentMode; // ← NEW, optional
     
  // ADD THESE FIELDS
     private Double discountPercentage;
-    private Double gstPercentage;
+    
+    // =========================
+    // TAX
+    // =========================
+    private Double gstPercentage;   // ✅ FINAL GST ONLY
     
     private List<IPDServiceUsage> ipdService;
 //    private List<IPDDoctorVisit> doctorVisits;

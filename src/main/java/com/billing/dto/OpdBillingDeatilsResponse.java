@@ -14,6 +14,9 @@ public class OpdBillingDeatilsResponse {
 	private Double dressing;
 	private Double injection;
 	private Double minorProcedure;
-	private Double total;
+	private Double totalFees;
 	private LocalDateTime visitDate;
+	private Double serviceCharges;
+	private Double amountToPay;
+	private Double payableAmount;
 }

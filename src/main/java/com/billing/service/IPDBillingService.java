@@ -12,7 +12,8 @@ public interface IPDBillingService {
     IpdBillingDetailsResponse getBillingDetailsByAdmissionId(Long admissionId);
  // ADD THIS METHOD
 //    IPDBillingDetails updateIpdBIll(IpdBillRequestDTO request);
-    String processPayment(IpdPaymentRequestDTO request);
+    void closeBillOnDischarge(Long admissionId);
+    void makePartialPayment(IpdPartialPaymentRequestDTO request);
 
     // ── Granular charges (services, doctor visits, medicines) ─────
     List<IPDServiceUsage> addServices(AddServicesRequest request);
@@ -25,4 +26,6 @@ public interface IPDBillingService {
     
  // NEW METHOD
     IPDBillingDetails updateIpdBill(IpdBillUpdateRequestDTO request);
+    
+    CreateIpdBillingAccountResponse createBillingAccount(CreateIpdBillingAccountRequest request);
 }

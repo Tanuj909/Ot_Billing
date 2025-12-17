@@ -1,18 +1,9 @@
 package com.billing.model;
 
-import java.time.LocalDate;
+import jakarta.persistence.*;
+import lombok.*;
+
 import java.time.LocalDateTime;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Table(name = "opd_billing_details")
@@ -20,32 +11,29 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class OPDBillingDetails {
-	
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
-	
-	private Double doctorFee;
-	
-	private Double emergencyFee;
-	
-	private Double dressing;
-	
-	private Double injection;
-	
-	private Double minorProcedure;
-	
-	private Double total;
-	
-	private LocalDateTime visitDate;
-	
-	private Long appointmentId;
-	
-	private Long doctorId;
-	
-	@OneToOne
-	@JoinColumn(name = "billing_id")
-	private BillingMaster billingMaster;
-	
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private Double doctorFee = 0.0;
+    private Double serviceCharges = 0.0;     // Total of all added services
+
+    private Double emergencyFee = 0.0;
+    private Double dressing = 0.0;
+    private Double injection = 0.0;
+    private Double minorProcedure = 0.0;
+
+    private Double totalFees;     // doctorFee + serviceCharges (gross)
+    private Double payableAmount; // What patient still owes (serviceCharges - doctorFee)
+
+    private LocalDateTime visitDate;
+    private Long appointmentId;
+    private Long doctorId;
+
+    @OneToOne
+    @JoinColumn(name = "billing_id", nullable = false)
+    private BillingMaster billingMaster;
 }

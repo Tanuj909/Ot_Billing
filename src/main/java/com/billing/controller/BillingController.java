@@ -1,5 +1,7 @@
 package com.billing.controller;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,20 +10,28 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.billing.dto.CreateIpdBillingAccountRequest;
+import com.billing.dto.CreateIpdBillingAccountResponse;
 import com.billing.dto.IpdBillGenerateRequestDTO;
 import com.billing.dto.IpdBillRequestDTO;
 import com.billing.dto.IpdBillUpdateRequestDTO;
 import com.billing.dto.IpdBillingDetailsResponse;
+import com.billing.dto.IpdPartialPaymentRequestDTO;
 import com.billing.dto.IpdPaymentRequestDTO;
 import com.billing.dto.OpdBillRequestDTO;
 import com.billing.dto.OpdBillingDeatilsResponse;
 import com.billing.dto.OpdPaymentRequestDTO;
+import com.billing.dto.OpdServiceUsageRequestDTO;
+import com.billing.dto.OpdServiceUsageResponseDTO;
 import com.billing.dto.PatientAdmissionRequest;
 import com.billing.model.IPDBillingDetails;
+import com.billing.model.IpdPaymentHistory;
 import com.billing.model.OPDBillingDetails;
 import com.billing.repository.BillingMasterRepository;
+import com.billing.repository.IpdPaymentHistoryRepository;
 import com.billing.service.BillingService;
 import com.billing.service.IPDBillingService;
 import com.billing.service.OPDBillingService;
@@ -43,6 +53,9 @@ public class BillingController {
 	  @Autowired
 	  private BillingMasterRepository billingMasterRepository;
 	  
+	  @Autowired
+	  private IpdPaymentHistoryRepository ipdPaymentHistoryRepository;
+	  
 //	  @Autowired
 //	  private PatientBillingService patientBillingService;
 //	  
@@ -58,6 +71,14 @@ public class BillingController {
     
     // IPD Controller
     
+    @PostMapping("/ipd/create-billing-account")
+    public ResponseEntity<CreateIpdBillingAccountResponse> createIpdBillingAccount(
+            @RequestBody CreateIpdBillingAccountRequest request) {
+        
+        CreateIpdBillingAccountResponse response = ipdBillingService.createBillingAccount(request);
+        return ResponseEntity.ok(response);
+    }
+    
     //Will generate the Bill for IPD
 	@PostMapping("ipd/generate-bill")
 	public ResponseEntity<IPDBillingDetails> generateIPDBill(@RequestBody IpdBillRequestDTO request){
@@ -65,14 +86,29 @@ public class BillingController {
 	}
 	
 
-	@PostMapping("/ipd/payment")
-	public ResponseEntity<String> makeIPDPayment(@RequestBody IpdPaymentRequestDTO request){	
-	String result = ipdBillingService.processPayment(request); 
-	return ResponseEntity.ok(result);
+	@PostMapping("/ipd/close-bill/{admissionId}")
+	public ResponseEntity<Void> closeBill(@PathVariable Long admissionId) {
+	    ipdBillingService.closeBillOnDischarge(admissionId);
+	    return ResponseEntity.ok().build();
+	}
+
+//	New End-Point for partial Payment(testing)
+	@PostMapping("/ipd/partial-payment")
+	public ResponseEntity<String> makePartialPayment(@RequestBody IpdPartialPaymentRequestDTO request) {
+	    ipdBillingService.makePartialPayment(request);
+	    return ResponseEntity.ok("₹" + request.getAmount() + " received successfully. Due amount updated.");
+	}
+	
+//	Get Payment History
+	@GetMapping("/ipd/payment-history/{admissionId}")
+	public ResponseEntity<List<IpdPaymentHistory>> getPaymentHistory(@PathVariable Long admissionId) {
+	    List<IpdPaymentHistory> history = ipdPaymentHistoryRepository
+	        .findByAdmissionIdOrderByPaymentDateDesc(admissionId);
+	    return ResponseEntity.ok(history);
 	}
 	
 	@GetMapping("/ipd/status")
-	public ResponseEntity<String> getPaymentStatus(Long admissionId){
+	public ResponseEntity<String> getPaymentStatus(@RequestParam Long admissionId){
 		String status = billingMasterRepository.findByAdmissionId(admissionId)
 	            .map(b -> b.getPaymentStatus().name())
 	            .orElse("NOT_FOUND");
@@ -99,16 +135,37 @@ public class BillingController {
 		return ResponseEntity.ok(opdBillingService.generateOpdBilling(request));
 	}
 	
-	@PutMapping("/opd/payment")
-	public ResponseEntity<String> makeOPDPayment(@RequestBody OpdPaymentRequestDTO request){
-		String result = opdBillingService.processPayment(request);
-		return ResponseEntity.ok(result);
-	}
+//	@PutMapping("/opd/payment")
+//	public ResponseEntity<String> makeOPDPayment(@RequestBody OpdPaymentRequestDTO request){
+//		String result = opdBillingService.processPayment(request);
+//		return ResponseEntity.ok(result);
+//	}
 	
 	@GetMapping("/opd/billing-detail/{appointmentId}")
 	public ResponseEntity<OpdBillingDeatilsResponse> getOPDBillingDetails(@PathVariable Long appointmentId){
-		OpdBillingDeatilsResponse response = opdBillingService.getBillingDetailsByAppoitmnetId(appointmentId);
+		OpdBillingDeatilsResponse response = opdBillingService.getBillingDetailsByAppointmentId(appointmentId);
 		return ResponseEntity.ok(response);
+	}
+	
+	@PostMapping("/opd/add-services")
+	public ResponseEntity<String> addService(@RequestBody List<OpdServiceUsageRequestDTO> requests){
+		return ResponseEntity.ok(opdBillingService.addServicesToBilling(requests));
+	}
+	
+	@PostMapping("/opd/process-payment")
+	public ResponseEntity<String> processFinalPayment(@RequestBody OpdPaymentRequestDTO request) {
+	    String result = opdBillingService.processPayment(request);
+	    return ResponseEntity.ok(result);
+	}
+
+	@GetMapping("/opd/services/{appointmentId}")
+	public ResponseEntity<List<OpdServiceUsageResponseDTO>> getAddedServices(
+	        @PathVariable Long appointmentId) {
+	    
+	    List<OpdServiceUsageResponseDTO> services = 
+	        opdBillingService.getAddedServicesByAppointmentId(appointmentId);
+	    
+	    return ResponseEntity.ok(services);
 	}
 	
 

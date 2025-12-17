@@ -1,7 +1,10 @@
 package com.billing.enums;
 
-public enum PaymentStatus {
+public enum PaymentStatus 
+{
 	 PENDING,
 	 PAID,
-	 CANCELLED
+	 PARTIAL,
+	 CANCELLED,
+	 FAILED // ADD
 }

@@ -30,7 +30,12 @@ public class IpdBillingDetailsResponse {
     private Double totalBeforeDiscount;
     private Double totalAfterDiscountAndGst;
     private List<IPDServiceUsage> ipdServices;
+    private Double advanceAmount;      // ← NEW, optional
+    private Double dueAmmount;
+    private Double totalPayedAmmount;
+    private String billingStatus;
 
+    
     // ADD GETTERS/SETTERS
 
     @Data
@@ -43,6 +48,7 @@ public class IpdBillingDetailsResponse {
         private Double totalAmount;
         private String paymentStatus;
         private String paymentMode;
+        private String advancePaymentMode; // ← NEW, optional
         private LocalDateTime billingDate;
     }
 }

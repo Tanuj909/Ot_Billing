@@ -42,20 +42,33 @@ public class IPDBillingDetails {
 	private BillingMaster billingMaster;
 	
 	private Long admissionId;
+	
+	
+//	IPD Room charges
     private Double roomCharges;
     private Double medicationCharges;
     private Double doctorFees;
     private Double nursingCharges;
     private Double diagnosticCharges;
-//    private Double otCharges;
     private Double procedureCharges;
     private Double foodCharges;
     private Double miscellaneousCharges;
+    private Double otCharges = 0.0;
     private Long daysAdmitted;
     private Double total;
     
     @Column(nullable = true)
     private Double serviceCharges;
+    
+    
+ // NEW REQUIRED FIELDS (as per your design)
+    private Double advancePaid = 0.0;           // Collected at admission
+    private Double totalPayments = 0.0;         // All payments during stay(Total payed amount)
+    private Double totalCharges = 0.0;          // Sum of all charges
+    private Double dueAmount = 0.0;             // totalCharges - (advance + payments)
+
+    private String billingStatus = "ACTIVE";    // ACTIVE / CLOSED
+    
     
  // ADD THESE FIELDS
     private Double discountPercentage;
@@ -66,15 +79,19 @@ public class IPDBillingDetails {
     private Double totalAfterDiscountAndGst ;  // final total
 //    private Double payableAmount;
 
+
     
- // Add these to your existing IPDBillingDetails class
+    
+ // Relationships (optional for audit)
+//    @OneToMany(mappedBy = "ipdBillingDetails", cascade = CascadeType.ALL, orphanRemoval = true)
+//    @JsonIgnore
+//    private List<IPDPayment> payments = new ArrayList<>();
 
     @OneToMany(mappedBy = "ipdBillingDetails", cascade = CascadeType.ALL, orphanRemoval = true)
 //    @Builder.Default
     @JsonIgnore
     private List<IPDServiceUsage> services = new ArrayList<>();
     
-
     @OneToMany(mappedBy = "ipdBillingDetails", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<IPDDoctorVisit> doctorVisits = new ArrayList<>();
@@ -83,7 +100,15 @@ public class IPDBillingDetails {
     @JsonIgnore
     private List<IPDMedication> medications = new ArrayList<>();
 
+    @OneToMany(mappedBy = "billingDetails", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private List<IpdPaymentHistory> paymentHistory = new ArrayList<>();
+    
+    
+    public void recalculateDueAmount() {
+        this.dueAmount = this.totalCharges - (this.advancePaid + this.totalPayments);
+        if (this.dueAmount < 0) this.dueAmount = 0.0;
+    }
 
-    // UPDATE total field comment: this is now final amount after GST
     
 }

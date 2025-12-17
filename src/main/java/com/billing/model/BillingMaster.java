@@ -43,6 +43,8 @@ public class BillingMaster {
 	
 	private Long appointmentId;
 	
+	private Long emergencyId;
+	
 //	@ManyToOne
 //	@JoinColumn(name = "patient_id")
 //	private Patient patient;
@@ -57,6 +59,8 @@ public class BillingMaster {
 	
 	@Enumerated(EnumType.STRING)
 	private PaymentMode paymentMode;
+	
+	private String advancePaymentMode;
 	
 	private LocalDateTime billingDate = LocalDateTime.now();
 }
