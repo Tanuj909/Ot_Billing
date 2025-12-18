@@ -71,13 +71,13 @@ public class BillingController {
     
     // IPD Controller
     
-    @PostMapping("/ipd/create-billing-account")
-    public ResponseEntity<CreateIpdBillingAccountResponse> createIpdBillingAccount(
-            @RequestBody CreateIpdBillingAccountRequest request) {
-        
-        CreateIpdBillingAccountResponse response = ipdBillingService.createBillingAccount(request);
-        return ResponseEntity.ok(response);
-    }
+//    @PostMapping("/ipd/create-billing-account")
+//    public ResponseEntity<CreateIpdBillingAccountResponse> createIpdBillingAccount(
+//            @RequestBody CreateIpdBillingAccountRequest request) {
+//        
+//        CreateIpdBillingAccountResponse response = ipdBillingService.createBillingAccount(request);
+//        return ResponseEntity.ok(response);
+//    }
     
     //Will generate the Bill for IPD
 	@PostMapping("ipd/generate-bill")

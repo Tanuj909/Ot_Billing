@@ -26,5 +26,9 @@ public class IPDServiceUsage {
     private Integer quantity = 1;
     private Double totalAmount;        // price * quantity
     private LocalDateTime serviceAddDate = LocalDateTime.now();
+ // Add these fields
+    private Double gstPercentage = 0.0;
+    private Double gstAmount = 0.0;  // totalAmount * gstPercentage / 100
+    
     
 }

@@ -1,5 +1,6 @@
 package com.billing.model;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -77,7 +78,10 @@ public class IPDBillingDetails {
     private Double gstAmount;
     private Double totalBeforeDiscount;
     private Double totalAfterDiscountAndGst ;  // final total
+    private Double totalItemGstAmount = 0.0;
 //    private Double payableAmount;
+    
+    private LocalDateTime updatedAt;
 
 
     

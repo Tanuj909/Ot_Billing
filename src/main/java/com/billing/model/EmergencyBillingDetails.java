@@ -74,6 +74,9 @@ public class EmergencyBillingDetails {
 	//DUE(Due = total - advancePaid)
 	private Double due;
 	
+	//To show how much to pay
+	private Double totalPayable;
+	
 	//(Payments Done by Patient/Family could be partial)
 	private Double totalPayment;
 	

@@ -16,5 +16,6 @@ public class AddServicesRequest {
         private Double price;
         private Integer quantity;
         private LocalDateTime serviceAddDate;
+        private Double gstPercentage;  // Must be sent from frontend/service master
     }
 }
