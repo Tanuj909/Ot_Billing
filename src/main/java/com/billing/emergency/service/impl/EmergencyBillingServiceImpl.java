@@ -20,6 +20,7 @@ import com.billing.emergency.dto.EmergencyDoctorVisitDto;
 import com.billing.emergency.dto.EmergencyItemDto;
 import com.billing.emergency.dto.GenerateEmergencyBillRequest;
 import com.billing.emergency.dto.GetEmergencyBillResponse;
+import com.billing.emergency.dto.IsHourly;
 import com.billing.emergency.dto.PartialPaymentRequest;
 import com.billing.emergency.dto.PartialPaymentResponse;
 import com.billing.emergency.dto.PaymentEntryDto;
@@ -88,20 +89,17 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    details.setDoctorVisits(new ArrayList<>()); // Initialize
 	    details.setTotalDoctorFees(0.0); // Initialize
 
-	    Long days = request.getDaysAdmitted() != null && request.getDaysAdmitted() > 0
-	                ? request.getDaysAdmitted() : 1L;
-	    details.setDaysAdmitted(days);
+	    
+	    Long totalHours = request.getTotalHoursAdmitted();
+	    if (totalHours == null || totalHours < 1) {
+	    	totalHours = 1L;
+	    }
+	    details.setTotalHoursAdmitted(totalHours);
 
 	    Double advance = request.getAdvancePaid() != null ? request.getAdvancePaid() : 0.0;
 	    details.setAdvancePaid(advance);
 	    details.setTotalPayment(advance);
 
-	    details.setMonitoringCharges(nullToZero(request.getMonitoringCharges()));
-	    details.setNursingCharges(nullToZero(request.getNursingCharges()));
-	    details.setEmergencyConsumable(nullToZero(request.getEmergencyConsumable()));
-
-	    Double roomCharges = nullToZero(request.getRoomChargesPerDay()) * days;
-	    details.setRoomCharges(roomCharges);
 
 	    // === Handle Initial Doctor Fees ===
 	    Double initialDoctorFees = request.getDoctorFees();
@@ -122,11 +120,7 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    }
 
 	    // === Calculate totals ===
-	    double totalBeforeDiscount = details.getTotalDoctorFees() +
-	                                 details.getMonitoringCharges() +
-	                                 details.getNursingCharges() +
-	                                 details.getEmergencyConsumable() +
-	                                 details.getRoomCharges();
+	    double totalBeforeDiscount = details.getTotalDoctorFees();
 
 	    details.setTotal(totalBeforeDiscount);
 
@@ -162,22 +156,13 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    response.setTotalAfterDiscount(finalTotal);
 	    response.setAdvancePaid(advance);
 	    response.setDue(details.getDue());
-
 	    response.setDoctorFees(details.getTotalDoctorFees());  // Now from field
-	    response.setMonitoringCharges(details.getMonitoringCharges());
-	    response.setNursingCharges(details.getNursingCharges());
-	    response.setEmergencyConsumable(details.getEmergencyConsumable());
-	    response.setRoomCharges(details.getRoomCharges());
-
 	    return response;
 	}
 
 
-
-
-
-
 	//--------------------------------------------Update Billing-----------------------------------------------------------------//
+
 	@Override
 	@Transactional
 	public UpdateEmergencyStayResponse updateStayAndRecalculate(UpdateEmergencyStayRequest request) {
@@ -190,61 +175,70 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	        throw new RuntimeException("Cannot update stay on a closed bill");
 	    }
 
-	    Long previousDays = details.getDaysAdmitted();
-	    Long newDays = request.getDaysAdmitted();
-	    details.setDaysAdmitted(newDays);
+	    // Only update the totalHoursAdmitted — nothing else changes
+	    Long totalHours = request.getTotalHoursAdmitted();
+	    if (totalHours == null || totalHours < 1) {
+	    	totalHours = 1L;
+	    }
+	    details.setTotalHoursAdmitted(totalHours);
 
-	    // Monitoring Charges
-	    double monitoringPerDay = request.getMonitoringChargesPerDay() != null
-	            ? request.getMonitoringChargesPerDay()
-	            : (previousDays > 0 ? details.getMonitoringCharges() / (double) previousDays : 0.0);
-	    details.setMonitoringCharges(monitoringPerDay * newDays);
+	    // === NO recalculation of monitoring, nursing, or room charges ===
+	    // These stay fixed as set during generateEmergencyBill or manual adjustment
 
-	    // Nursing Charges
-	    double nursingPerDay = request.getNursingChargesPerDay() != null
-	            ? request.getNursingChargesPerDay()
-	            : (previousDays > 0 ? details.getNursingCharges() / (double) previousDays : 0.0);
-	    details.setNursingCharges(nursingPerDay * newDays);
-
-	    // Room Charges
-	    double roomPerDay = previousDays > 0 ? details.getRoomCharges() / (double) previousDays : 0.0;
-	    details.setRoomCharges(roomPerDay * newDays);
-
-	    // === Items & GST (unchanged) ===
+	    // Recalculate Only Hourly Charged Items(isHourly = YES)
+	    List<EmergencyBillingItem> items = details.getItems();
+	    
+	    for(EmergencyBillingItem item : items) {
+	    	if(IsHourly.YES.equals(item.getIsHourly())) {
+	    		
+	    		//Total Amount Calculation
+	    		Double baseAmount = item.getPrice() * item.getQuantity() * totalHours;
+	    		item.setTotalAmount(baseAmount);
+	    		
+	    		//Recalculate GST
+	    		Double gstRate = nullToZero(item.getGstPercentage());
+	    		Double gstAmount = (baseAmount * gstRate)/100;
+	    		item.setGstAmount(BigDecimal.valueOf(gstAmount));
+	    		}
+	    	// isHourly = NO → leave totalAmount and gstAmount unchanged	    	
+	    }
+	    
+	    
+	    // === Recalculate only the totals based on current stored values ===
 	    double itemsTotal = details.getItems().stream()
 	            .mapToDouble(item -> item.getTotalAmount() != null ? item.getTotalAmount() : 0.0)
 	            .sum();
+	    
+	    double totalItemGst = items.stream()
+	            .mapToDouble(i -> i.getGstAmount() != null ? i.getGstAmount().doubleValue() : 0.0)
+	            .sum();
 
-	    double itemsGst = details.getItemGstAmount() != null ? details.getItemGstAmount() : 0.0;
+	    details.setItemGstAmount(totalItemGst);
 
-	    // === Base total using stored totalDoctorFees ===
-	    double baseTotal = details.getTotalDoctorFees() +  // Direct from field
-	                       details.getMonitoringCharges() +
-	                       details.getNursingCharges() +
-	                       details.getRoomCharges() +
-	                       (details.getEmergencyConsumable() != null ? details.getEmergencyConsumable() : 0.0);
+	    // Base total = doctor fees only (others removed)
+	    double baseTotal = nullToZero(details.getTotalDoctorFees());
 
 	    double grandTotalBeforeDiscount = baseTotal + itemsTotal;
 	    details.setTotal(grandTotalBeforeDiscount);
 
-	    // === Recalculate discount ===
-	    double discountPercentage = details.getDiscountPercentage() != null ? details.getDiscountPercentage() : 0.0;
+	    // Discount
+	    double discountPercentage = nullToZero(details.getDiscountPercentage());
 	    double discountAmount = (grandTotalBeforeDiscount * discountPercentage) / 100.0;
 	    details.setDiscountAmount(discountAmount);
 
 	    double totalAfterDiscount = grandTotalBeforeDiscount - discountAmount;
 	    details.setTotalAfterDiscount(totalAfterDiscount);
 
-	    // === Final total ===
-	    double finalTotal = totalAfterDiscount + itemsGst;
+	    // GST + Final
+//	    double itemsGst = nullToZero(details.getItemGstAmount());
+	    double finalTotal = totalAfterDiscount + totalItemGst;
 	    details.setTotalAfterDiscountAndGst(finalTotal);
 
-	    // === Due ===
-	    double totalPaid = details.getTotalPayment() != null ? details.getTotalPayment() : 0.0;
+	    // Due
+	    double totalPaid = nullToZero(details.getTotalPayment());
 	    details.setDue(finalTotal - totalPaid);
 
 	    details.setUpdatedAt(LocalDateTime.now());
-
 	    emergencyBillingDetailsRepo.save(details);
 
 	    // Sync BillingMaster
@@ -255,14 +249,10 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    // === Response ===
 	    UpdateEmergencyStayResponse response = new UpdateEmergencyStayResponse();
 	    response.setEmergencyId(request.getEmergencyId());
-	    response.setDaysAdmitted(newDays);
-	    response.setDoctorFees(details.getTotalDoctorFees());  // Now from synced field
-	    response.setMonitoringCharges(details.getMonitoringCharges());
-	    response.setNursingCharges(details.getNursingCharges());
-	    response.setRoomCharges(details.getRoomCharges());
-	    response.setEmergencyConsumable(details.getEmergencyConsumable());
+	    response.setTotalHoursAdmitted(totalHours);
+	    response.setDoctorFees(details.getTotalDoctorFees());
 	    response.setItemsTotal(itemsTotal);
-	    response.setItemsGst(itemsGst);
+	    response.setItemsGst(totalItemGst);
 	    response.setDiscountApplied(discountAmount);
 	    response.setFinalBillAmount(finalTotal);
 	    response.setTotalPaid(totalPaid);
@@ -309,6 +299,7 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	                .gstPercentage(itemDto.getGstPercentage())
 	                .gstAmount(BigDecimal.valueOf(gstAmount))
 	                .serviceAddDate(LocalDateTime.now())
+	                .isHourly(itemDto.getIsHourly())
 	                .build();
 
 	        details.getItems().add(item); // Cascade saves
@@ -323,11 +314,7 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    details.setItemGstAmount(newItemGst);
 
 	    // === Recalculate full bill ===
-	    double baseChargesTotal = details.getTotalDoctorFees() +  // Use synced field
-	                              details.getMonitoringCharges() +
-	                              details.getNursingCharges() +
-	                              details.getRoomCharges() +
-	                              (details.getEmergencyConsumable() != null ? details.getEmergencyConsumable() : 0.0);
+	    double baseChargesTotal = details.getTotalDoctorFees();
 
 	    // All items total (including newly added)
 	    double itemsTotal = details.getItems().stream()
@@ -372,7 +359,6 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    return response;
 	}
 
-
 //--------------------------------------------Get Billing-----------------------------------------------------------------//	
 	@Override
 //	@Transactional(readOnly = true)
@@ -396,6 +382,7 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	                dto.setGstPercentage(item.getGstPercentage());
 	                dto.setGstAmount(item.getGstAmount() != null ? item.getGstAmount().doubleValue() : 0.0);
 	                dto.setServiceAddDate(item.getServiceAddDate());
+	                dto.setIsHourly(item.getIsHourly());
 	                return dto;
 	            })
 	            .sorted((a, b) -> b.getServiceAddDate().compareTo(a.getServiceAddDate())) // Latest first
@@ -422,11 +409,7 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	            .mapToDouble(EmergencyBillingItemDto::getTotalAmount)
 	            .sum();
 
-	    double baseTotal = details.getTotalDoctorFees() +  // From synced field
-	                       details.getMonitoringCharges() +
-	                       details.getNursingCharges() +
-	                       details.getRoomCharges() +
-	                       (details.getEmergencyConsumable() != null ? details.getEmergencyConsumable() : 0.0);
+	    double baseTotal = details.getTotalDoctorFees();
 
 	    double totalBeforeDiscount = baseTotal + itemsTotal;
 
@@ -455,16 +438,11 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    response.setPatientExternalId(master.getPatientExternalId());
 	    response.setHospitaExternallId(master.getHospitaExternallId());
 
-	    response.setDaysAdmitted(details.getDaysAdmitted());
+	    response.setTotalHoursAdmitted(details.getTotalHoursAdmitted());
 
 	    // Doctor Fees – Total and Breakdown
 	    response.setTotalDoctorFees(details.getTotalDoctorFees());  // Synced total
 	    response.setDoctorVisits(doctorVisitDtos);                  // Full list
-
-	    response.setMonitoringCharges(details.getMonitoringCharges());
-	    response.setNursingCharges(details.getNursingCharges());
-	    response.setRoomCharges(details.getRoomCharges());
-	    response.setEmergencyConsumable(details.getEmergencyConsumable());
 
 	    response.setItems(itemDtos);
 
@@ -738,11 +716,7 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	            .mapToDouble(i -> i.getTotalAmount() != null ? i.getTotalAmount() : 0.0)
 	            .sum();
 
-	    double baseTotal = details.getTotalDoctorFees() +
-	                       details.getMonitoringCharges() +
-	                       details.getNursingCharges() +
-	                       details.getRoomCharges() +
-	                       (details.getEmergencyConsumable() != null ? details.getEmergencyConsumable() : 0.0);
+	    double baseTotal = details.getTotalDoctorFees();
 
 	    double grandTotalBeforeDiscount = baseTotal + itemsTotal;
 	    details.setTotal(grandTotalBeforeDiscount);

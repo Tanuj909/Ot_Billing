@@ -67,7 +67,7 @@ public class IPDBillingDetails {
     private Double totalPayments = 0.0;         // All payments during stay(Total payed amount)
     private Double totalCharges = 0.0;          // Sum of all charges
     private Double dueAmount = 0.0;             // totalCharges - (advance + payments)
-
+    private Double dueTotalPayable= 0.0;
     private String billingStatus = "ACTIVE";    // ACTIVE / CLOSED
     
     
@@ -82,10 +82,14 @@ public class IPDBillingDetails {
 //    private Double payableAmount;
     
     private LocalDateTime updatedAt;
-
-
     
+    private Double specialDiscountAmount = 0.0;     // New concession amount
+    private Double specialDiscountPercentage= 0.0;
+    private Double dueAfterSpecialDiscount= 0.0;
     
+    @Column(nullable = true)
+    private String specialDiscountReason;          // Optional: "Management Approval", "Charity", etc.
+
  // Relationships (optional for audit)
 //    @OneToMany(mappedBy = "ipdBillingDetails", cascade = CascadeType.ALL, orphanRemoval = true)
 //    @JsonIgnore

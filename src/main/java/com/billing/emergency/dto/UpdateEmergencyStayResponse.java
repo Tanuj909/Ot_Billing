@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 public class UpdateEmergencyStayResponse {
     private Long emergencyId;
-    private Long daysAdmitted;
+    private Long totalHoursAdmitted;
     private Double doctorFees;              // unchanged, shown for reference
     private Double monitoringCharges;       // recalculated
     private Double nursingCharges;          // recalculated

@@ -23,14 +23,9 @@ public class GetEmergencyBillResponse {
     private Long hospitaExternallId;
 
     // Stay details
-    private Long daysAdmitted;
+	private Long totalHoursAdmitted; 
 
     // Fixed Charges
-//    private Double doctorFees;
-    private Double monitoringCharges;
-    private Double nursingCharges;
-    private Double roomCharges;
-    private Double emergencyConsumable;
     private Double totalDoctorFees;  // Renamed from doctorFees for clarity
 
     private List<EmergencyDoctorVisitDto> doctorVisits;  // New breakdown

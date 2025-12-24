@@ -17,10 +17,5 @@ public class EmergencyBillResponse {
 
     // Individual charges (for confirmation)
     private Double doctorFees;
-    private Double monitoringCharges;
-    private Double nursingCharges;
-    private Double emergencyConsumable;
-    private Double roomCharges;
-
     private String message = "Emergency bill generated successfully";
 }

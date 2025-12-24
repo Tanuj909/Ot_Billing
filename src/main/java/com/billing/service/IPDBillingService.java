@@ -27,5 +27,8 @@ public interface IPDBillingService {
  // NEW METHOD
     IPDBillingDetails updateIpdBill(IpdBillUpdateRequestDTO request);
     
+//    Special Discount
+    IPDBillingDetails specialDiscounts(SpecialDiscountRequestDTO request);
+    
 //    CreateIpdBillingAccountResponse createBillingAccount(CreateIpdBillingAccountRequest request);
 }

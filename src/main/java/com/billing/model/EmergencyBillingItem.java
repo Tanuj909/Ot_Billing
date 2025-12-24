@@ -3,10 +3,9 @@ package com.billing.model;
 import java.math.BigDecimal;
 import java.security.Provider.Service;
 import java.time.LocalDateTime;
-
+import com.billing.emergency.dto.IsHourly;
 import com.billing.enums.EmergencyItemsCategory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -40,8 +39,8 @@ public class EmergencyBillingItem  {
     @JsonIgnore
     private EmergencyBillingDetails emergencyBillingDetails;
     
-    @Enumerated(EnumType.STRING)
-    private EmergencyItemsCategory category;
+//  @Enumerated(EnumType.STRING)
+    private String category;
     
     private String serviceName;
     private Double price;
@@ -50,5 +49,7 @@ public class EmergencyBillingItem  {
     private LocalDateTime serviceAddDate = LocalDateTime.now();
     private Double gstPercentage;
     private BigDecimal gstAmount;
+    @Enumerated(EnumType.STRING)
+    private IsHourly isHourly;
     
 }

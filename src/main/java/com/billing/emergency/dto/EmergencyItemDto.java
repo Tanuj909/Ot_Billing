@@ -2,6 +2,8 @@ package com.billing.emergency.dto;
 
 import com.billing.enums.EmergencyItemsCategory;
 
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -17,7 +19,7 @@ public class EmergencyItemDto {
     @NotBlank(message = "Service name is required")
     private String serviceName;
 
-    private EmergencyItemsCategory category; // e.g., MEDICINE, LAB_TEST, PROCEDURE
+    private String category; // e.g., MEDICINE, LAB_TEST, PROCEDURE
 
     @NotNull(message = "Price is required")
     @PositiveOrZero
@@ -28,4 +30,7 @@ public class EmergencyItemDto {
 
     @PositiveOrZero
     private Double gstPercentage = 0.0; // Optional GST % for this item
+    
+    @Enumerated(EnumType.STRING)
+    private IsHourly isHourly;
 }

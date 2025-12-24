@@ -32,6 +32,7 @@ public class IpdBillingDetailsResponse {
     private List<IPDServiceUsage> ipdServices;
     private Double advanceAmount;      // ← NEW, optional
     private Double dueAmmount;
+    private Double dueTotalPayable;
     private Double totalPayedAmmount;
     private String billingStatus;
 

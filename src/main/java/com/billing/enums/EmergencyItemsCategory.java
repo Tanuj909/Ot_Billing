@@ -5,7 +5,13 @@ public enum EmergencyItemsCategory {
     PROCEDURE,
     MEDICINE,
     CONSUMABLE,
-    LAB,
     RADIOLOGY,
+    LAB,
+    PHARMACY,
+    MISCELLANEOUS,
+    ROOMFACILITY,
+    TRANSPORT,
+    MEDICAL,
+    NONMEDICAL,
     OTHER
 }

@@ -42,19 +42,14 @@ public class EmergencyBillingDetails {
 	private LocalDateTime createAt = LocalDateTime.now();
 	private LocalDateTime updatedAt;
 	
-	//No.of days Patient Admitted
-	private Long daysAdmitted;
+	//No.of hours Patient Admitted	
+	private Long totalHoursAdmitted; 
 	
 	private Double advancePaid;
 
 	private Double serviceCharges;
 	
 	private Double doctorFees;
-	private Double monitoringCharges;
-	private Double nursingCharges;
-	private Double emergencyConsumable;
-	private Double roomCharges;
-	
 	//Sum of all the charges
 	private Double total;
 	
@@ -75,7 +70,7 @@ public class EmergencyBillingDetails {
 	private Double due;
 	
 	//To show how much to pay
-	private Double totalPayable;
+	private Double dueTotalPayable;
 	
 	//(Payments Done by Patient/Family could be partial)
 	private Double totalPayment;

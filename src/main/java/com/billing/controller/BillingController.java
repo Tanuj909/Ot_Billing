@@ -27,6 +27,7 @@ import com.billing.dto.OpdPaymentRequestDTO;
 import com.billing.dto.OpdServiceUsageRequestDTO;
 import com.billing.dto.OpdServiceUsageResponseDTO;
 import com.billing.dto.PatientAdmissionRequest;
+import com.billing.dto.SpecialDiscountRequestDTO;
 import com.billing.model.IPDBillingDetails;
 import com.billing.model.IpdPaymentHistory;
 import com.billing.model.OPDBillingDetails;
@@ -127,6 +128,13 @@ public class BillingController {
 	    IPDBillingDetails updated = ipdBillingService.updateIpdBill(request);
 	    return ResponseEntity.ok(updated);
 	}
+	
+	// Special Discount
+	@PostMapping("ipd/special-discount")
+	public ResponseEntity<IPDBillingDetails> specialDiscount(@RequestBody SpecialDiscountRequestDTO request){
+		IPDBillingDetails updated = ipdBillingService.specialDiscounts(request);
+		return ResponseEntity.ok(updated);
+		}
 	
 //	OPD Controller---------------
 	

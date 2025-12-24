@@ -14,7 +14,7 @@ public class GenerateEmergencyBillRequest {
     private Long hospitaExternallId;         // From BillingMaster
     private Long patientExternalId;          // From BillingMaster
     private Double advancePaid;              // Optional initial advance
-    private Long daysAdmitted;               // Optional initial days
+    private Long totalHoursAdmitted;
     private PaymentMode paymentMode;
 	private Double doctorFees;
 	private Double monitoringCharges;
