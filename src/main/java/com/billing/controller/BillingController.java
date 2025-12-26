@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.billing.dto.ChangeIsDailyRequestDTO;
 import com.billing.dto.CreateIpdBillingAccountRequest;
 import com.billing.dto.CreateIpdBillingAccountResponse;
 import com.billing.dto.IpdBillGenerateRequestDTO;
@@ -29,6 +30,7 @@ import com.billing.dto.OpdServiceUsageResponseDTO;
 import com.billing.dto.PatientAdmissionRequest;
 import com.billing.dto.SpecialDiscountRequestDTO;
 import com.billing.model.IPDBillingDetails;
+import com.billing.model.IPDServiceUsage;
 import com.billing.model.IpdPaymentHistory;
 import com.billing.model.OPDBillingDetails;
 import com.billing.repository.BillingMasterRepository;
@@ -135,6 +137,13 @@ public class BillingController {
 		IPDBillingDetails updated = ipdBillingService.specialDiscounts(request);
 		return ResponseEntity.ok(updated);
 		}
+	
+//	Update Service Isdaily
+	@PutMapping("/ipd/service/change-daily-status")
+	public ResponseEntity<IPDServiceUsage> changeServiceDailyStatus(@RequestBody ChangeIsDailyRequestDTO request) {
+	    IPDServiceUsage updated = ipdBillingService.changeServiceDailyStatus(request);
+	    return ResponseEntity.ok(updated);
+	}
 	
 //	OPD Controller---------------
 	

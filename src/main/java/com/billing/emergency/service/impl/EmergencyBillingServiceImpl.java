@@ -2,6 +2,7 @@ package com.billing.emergency.service.impl;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -163,6 +164,104 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 
 	//--------------------------------------------Update Billing-----------------------------------------------------------------//
 
+//	@Override
+//	@Transactional
+//	public UpdateEmergencyStayResponse updateStayAndRecalculate(UpdateEmergencyStayRequest request) {
+//
+//	    EmergencyBillingDetails details = emergencyBillingDetailsRepo
+//	            .findByEmergencyId(request.getEmergencyId())
+//	            .orElseThrow(() -> new RuntimeException("Emergency bill not found for emergencyId: " + request.getEmergencyId()));
+//
+//	    if ("CLOSED".equalsIgnoreCase(details.getBillingStatus())) {
+//	        throw new RuntimeException("Cannot update stay on a closed bill");
+//	    }
+//
+//	    // Only update the totalHoursAdmitted — nothing else changes
+//	    Long totalHours = request.getTotalHoursAdmitted();
+//	    if (totalHours == null || totalHours < 1) {
+//	    	totalHours = 1L;
+//	    }
+//	    details.setTotalHoursAdmitted(totalHours);
+//
+//	    // === NO recalculation of monitoring, nursing, or room charges ===
+//	    // These stay fixed as set during generateEmergencyBill or manual adjustment
+//
+//	    // Recalculate Only Hourly Charged Items(isHourly = YES)
+//	    List<EmergencyBillingItem> items = details.getItems();
+//	    
+//	    for(EmergencyBillingItem item : items) {
+//	    	if(IsHourly.YES.equals(item.getIsHourly())) {
+//	    		
+//	    		//Total Amount Calculation
+//	    		Double baseAmount = item.getPrice() * item.getQuantity() * totalHours;
+//	    		item.setTotalAmount(baseAmount);
+//	    		
+//	    		//Recalculate GST
+//	    		Double gstRate = nullToZero(item.getGstPercentage());
+//	    		Double gstAmount = (baseAmount * gstRate)/100;
+//	    		item.setGstAmount(BigDecimal.valueOf(gstAmount));
+//	    		}
+//	    	// isHourly = NO → leave totalAmount and gstAmount unchanged	    	
+//	    }
+//	    
+//	    
+//	    // === Recalculate only the totals based on current stored values ===
+//	    double itemsTotal = details.getItems().stream()
+//	            .mapToDouble(item -> item.getTotalAmount() != null ? item.getTotalAmount() : 0.0)
+//	            .sum();
+//	    
+//	    double totalItemGst = items.stream()
+//	            .mapToDouble(i -> i.getGstAmount() != null ? i.getGstAmount().doubleValue() : 0.0)
+//	            .sum();
+//
+//	    details.setItemGstAmount(totalItemGst);
+//
+//	    // Base total = doctor fees only (others removed)
+//	    double baseTotal = nullToZero(details.getTotalDoctorFees());
+//
+//	    double grandTotalBeforeDiscount = baseTotal + itemsTotal;
+//	    details.setTotal(grandTotalBeforeDiscount);
+//
+//	    // Discount
+//	    double discountPercentage = nullToZero(details.getDiscountPercentage());
+//	    double discountAmount = (grandTotalBeforeDiscount * discountPercentage) / 100.0;
+//	    details.setDiscountAmount(discountAmount);
+//
+//	    double totalAfterDiscount = grandTotalBeforeDiscount - discountAmount;
+//	    details.setTotalAfterDiscount(totalAfterDiscount);
+//
+//	    // GST + Final
+////	    double itemsGst = nullToZero(details.getItemGstAmount());
+//	    double finalTotal = totalAfterDiscount + totalItemGst;
+//	    details.setTotalAfterDiscountAndGst(finalTotal);
+//
+//	    // Due
+//	    double totalPaid = nullToZero(details.getTotalPayment());
+//	    details.setDue(finalTotal - totalPaid);
+//
+//	    details.setUpdatedAt(LocalDateTime.now());
+//	    emergencyBillingDetailsRepo.save(details);
+//
+//	    // Sync BillingMaster
+//	    BillingMaster master = details.getBillingMaster();
+//	    master.setTotalAmount(finalTotal);
+//	    billingMasterRepo.save(master);
+//
+//	    // === Response ===
+//	    UpdateEmergencyStayResponse response = new UpdateEmergencyStayResponse();
+//	    response.setEmergencyId(request.getEmergencyId());
+//	    response.setTotalHoursAdmitted(totalHours);
+//	    response.setDoctorFees(details.getTotalDoctorFees());
+//	    response.setItemsTotal(itemsTotal);
+//	    response.setItemsGst(totalItemGst);
+//	    response.setDiscountApplied(discountAmount);
+//	    response.setFinalBillAmount(finalTotal);
+//	    response.setTotalPaid(totalPaid);
+//	    response.setDueAmount(details.getDue());
+//
+//	    return response;
+//	}
+
 	@Override
 	@Transactional
 	public UpdateEmergencyStayResponse updateStayAndRecalculate(UpdateEmergencyStayRequest request) {
@@ -175,47 +274,52 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	        throw new RuntimeException("Cannot update stay on a closed bill");
 	    }
 
-	    // Only update the totalHoursAdmitted — nothing else changes
+	    // We no longer use totalHoursAdmitted for calculation — only for display if needed
+	    // Keep it updated for reference
 	    Long totalHours = request.getTotalHoursAdmitted();
-	    if (totalHours == null || totalHours < 1) {
-	    	totalHours = 1L;
+	    if (totalHours != null && totalHours >= 1) {
+	        details.setTotalHoursAdmitted(totalHours);
 	    }
-	    details.setTotalHoursAdmitted(totalHours);
 
-	    // === NO recalculation of monitoring, nursing, or room charges ===
-	    // These stay fixed as set during generateEmergencyBill or manual adjustment
-
-	    // Recalculate Only Hourly Charged Items(isHourly = YES)
+	    LocalDateTime now = LocalDateTime.now();
 	    List<EmergencyBillingItem> items = details.getItems();
-	    
-	    for(EmergencyBillingItem item : items) {
-	    	if(IsHourly.YES.equals(item.getIsHourly())) {
-	    		
-	    		//Total Amount Calculation
-	    		Double baseAmount = item.getPrice() * item.getQuantity() * totalHours;
-	    		item.setTotalAmount(baseAmount);
-	    		
-	    		//Recalculate GST
-	    		Double gstRate = nullToZero(item.getGstPercentage());
-	    		Double gstAmount = (baseAmount * gstRate)/100;
-	    		item.setGstAmount(BigDecimal.valueOf(gstAmount));
-	    		}
-	    	// isHourly = NO → leave totalAmount and gstAmount unchanged	    	
+
+	    // Recalculate only hourly items based on their individual serviceAddDate
+	    for (EmergencyBillingItem item : items) {
+	        if (IsHourly.YES.equals(item.getIsHourly())) {
+	            LocalDateTime itemStartTime = item.getServiceAddDate();
+	            if (itemStartTime == null) {
+	                itemStartTime = details.getCreateAt(); // fallback to bill creation time
+	            }
+
+	            long elapsedMinutes = ChronoUnit.MINUTES.between(itemStartTime, now);
+
+	            // Ceiling to full hour + minimum 1 hour
+	            long billableHoursForItem = (elapsedMinutes > 0) ? ((elapsedMinutes + 59) / 60) : 1L;
+
+	            Double baseAmount = item.getPrice() * item.getQuantity() * billableHoursForItem;
+	            item.setTotalAmount(baseAmount);
+
+	            // Recalculate GST
+	            Double gstRate = nullToZero(item.getGstPercentage());
+	            Double gstAmount = (baseAmount * gstRate) / 100.0;
+	            item.setGstAmount(BigDecimal.valueOf(gstAmount));
+	        }
+	        // isHourly = NO → leave unchanged (one-time charge)
 	    }
-	    
-	    
-	    // === Recalculate only the totals based on current stored values ===
-	    double itemsTotal = details.getItems().stream()
-	            .mapToDouble(item -> item.getTotalAmount() != null ? item.getTotalAmount() : 0.0)
+
+	    // Recalculate totals from all items
+	    double itemsTotal = items.stream()
+	            .mapToDouble(i -> nullToZero(i.getTotalAmount()))
 	            .sum();
-	    
+
 	    double totalItemGst = items.stream()
 	            .mapToDouble(i -> i.getGstAmount() != null ? i.getGstAmount().doubleValue() : 0.0)
 	            .sum();
 
 	    details.setItemGstAmount(totalItemGst);
 
-	    // Base total = doctor fees only (others removed)
+	    // Base total = doctor fees only
 	    double baseTotal = nullToZero(details.getTotalDoctorFees());
 
 	    double grandTotalBeforeDiscount = baseTotal + itemsTotal;
@@ -229,8 +333,7 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    double totalAfterDiscount = grandTotalBeforeDiscount - discountAmount;
 	    details.setTotalAfterDiscount(totalAfterDiscount);
 
-	    // GST + Final
-//	    double itemsGst = nullToZero(details.getItemGstAmount());
+	    // Final total
 	    double finalTotal = totalAfterDiscount + totalItemGst;
 	    details.setTotalAfterDiscountAndGst(finalTotal);
 
@@ -246,10 +349,10 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 	    master.setTotalAmount(finalTotal);
 	    billingMasterRepo.save(master);
 
-	    // === Response ===
+	    // Response
 	    UpdateEmergencyStayResponse response = new UpdateEmergencyStayResponse();
 	    response.setEmergencyId(request.getEmergencyId());
-	    response.setTotalHoursAdmitted(totalHours);
+	    response.setTotalHoursAdmitted(details.getTotalHoursAdmitted());
 	    response.setDoctorFees(details.getTotalDoctorFees());
 	    response.setItemsTotal(itemsTotal);
 	    response.setItemsGst(totalItemGst);
@@ -260,7 +363,6 @@ public class EmergencyBillingServiceImpl implements EmergencyBillingService{
 
 	    return response;
 	}
-
 	
 //--------------------------------------------Add Items to Billing-----------------------------------------------------------------//	
 

@@ -3,6 +3,7 @@ package com.billing.model;
 
 import java.time.LocalDateTime;
 
+import com.billing.dto.IsDaily;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
@@ -29,6 +30,8 @@ public class IPDServiceUsage {
  // Add these fields
     private Double gstPercentage = 0.0;
     private Double gstAmount = 0.0;  // totalAmount * gstPercentage / 100
+    @Enumerated(EnumType.STRING)
+    private IsDaily isDaily;
     
     
 }

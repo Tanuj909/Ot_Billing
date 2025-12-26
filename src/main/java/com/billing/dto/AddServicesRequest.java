@@ -17,5 +17,7 @@ public class AddServicesRequest {
         private Integer quantity;
         private LocalDateTime serviceAddDate;
         private Double gstPercentage;  // Must be sent from frontend/service master
+     // === NEW FIELD ===
+        private IsDaily isDaily;  // YES or NO (can be optional, default to NO if null)
     }
 }

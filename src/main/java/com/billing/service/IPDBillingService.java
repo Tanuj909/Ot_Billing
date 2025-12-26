@@ -29,6 +29,7 @@ public interface IPDBillingService {
     
 //    Special Discount
     IPDBillingDetails specialDiscounts(SpecialDiscountRequestDTO request);
+	IPDServiceUsage changeServiceDailyStatus(ChangeIsDailyRequestDTO request);
     
 //    CreateIpdBillingAccountResponse createBillingAccount(CreateIpdBillingAccountRequest request);
 }

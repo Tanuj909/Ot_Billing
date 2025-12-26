@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.billing.model.IPDServiceUsage;
 
+import jakarta.persistence.Column;
 import lombok.Data;
 
 @Data
@@ -30,11 +31,16 @@ public class IpdBillingDetailsResponse {
     private Double totalBeforeDiscount;
     private Double totalAfterDiscountAndGst;
     private List<IPDServiceUsage> ipdServices;
+    private Double serviceCharges;
     private Double advanceAmount;      // ← NEW, optional
     private Double dueAmmount;
     private Double dueTotalPayable;
     private Double totalPayedAmmount;
     private String billingStatus;
+    private Double specialDiscountAmount;   
+    private Double specialDiscountPercentage;
+    private Double dueAfterSpecialDiscount;
+    private String specialDiscountReason;  
 
     
     // ADD GETTERS/SETTERS
