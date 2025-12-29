@@ -581,7 +581,11 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         
         IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(admissionId)
                 .orElseThrow(() -> new RuntimeException("Billing Details not found!"));
-
+        
+        IPDRoomAllocation roomsAllocation = ipdRoomAllocationRepository.findByIpdBillingDetailsAndReleaseDateIsNull(billing)
+        		.orElseThrow(()-> new RuntimeException("Room not found Where Release Date Is null!"));
+        
+        roomsAllocation.setReleaseDate(LocalDateTime.now());
         // === BEST LOGIC: Check if special discount was EVER applied ===
         boolean specialDiscountApplied = 
             (billing.getSpecialDiscountAmount() != null && billing.getSpecialDiscountAmount() > 0) ||
@@ -607,6 +611,7 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         billingMaster.setPaymentStatus(PaymentStatus.PAID);
         billing.setBillingStatus("INACTIVE");
 
+        ipdRoomAllocationRepository.save(roomsAllocation);
         billingMasterRepository.save(billingMaster);
         ipdBillingRepository.save(billing);
     }
