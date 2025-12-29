@@ -3,6 +3,7 @@ package com.billing.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.billing.ipd.entity.IPDRoomAllocation;
 import com.billing.model.IPDServiceUsage;
 
 import jakarta.persistence.Column;
@@ -31,6 +32,7 @@ public class IpdBillingDetailsResponse {
     private Double totalBeforeDiscount;
     private Double totalAfterDiscountAndGst;
     private List<IPDServiceUsage> ipdServices;
+    private List<IPDRoomAllocation> ipdRooms;
     private Double serviceCharges;
     private Double advanceAmount;      // ← NEW, optional
     private Double dueAmmount;

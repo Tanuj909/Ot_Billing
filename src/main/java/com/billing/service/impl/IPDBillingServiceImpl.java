@@ -5,12 +5,17 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.billing.dto.*;
 import com.billing.dto.AddServicesRequest.ServiceItem;
 import com.billing.enums.PaymentMode;
 import com.billing.enums.PaymentStatus;
+import com.billing.ipd.entity.IPDRoomAllocation;
+import com.billing.ipd.repository.IPDRoomAllocationRepository;
 import com.billing.model.*;
 import com.billing.repository.*;
 import com.billing.service.IPDBillingService;
@@ -25,6 +30,7 @@ public class IPDBillingServiceImpl implements IPDBillingService {
     @Autowired private IPDDoctorVisitRepository ipdDoctorVisitRepository;
     @Autowired private IPDMedicationRepository ipdMedicationRepository;
     @Autowired private IpdPaymentHistoryRepository ipdPaymentHistoryRepository;
+    @Autowired private IPDRoomAllocationRepository ipdRoomAllocationRepository;
 
     //->Round to nearest whole Rupee/Value
     private double round0(double value) {
@@ -43,7 +49,18 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 
         long daysAdmitted = Math.max(1, ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1);
 
+        Integer bedNumber = request.getBedNumber();
+        String roomNumber = request.getRoomNumber();
         double roomCharges = request.getRoomRatePerDay() * daysAdmitted;
+        
+        IPDRoomAllocation roomAllocation = new IPDRoomAllocation();
+        roomAllocation.setBedNumber(bedNumber);
+        roomAllocation.setRoomNumber(roomNumber);
+        roomAllocation.setBedPricePerDay(request.getRoomRatePerDay());
+        roomAllocation.setAllocationDate(LocalDateTime.now());
+        roomAllocation.setDaysAdmitted(daysAdmitted);
+        
+        
         double medicationCharges = nullToZero(request.getMedicationCharges());
         double doctorFees = nullToZero(request.getDoctorFee());
         double nursingCharges = nullToZero(request.getNursingCharges());
@@ -110,11 +127,16 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         details.setDueAmount(round0(finalTotal - advancePaid));
         details.setBillingStatus("ACTIVE");
 
-        return ipdBillingRepository.save(details);
+        IPDBillingDetails ipdBillingDetails = ipdBillingRepository.save(details);
+        roomAllocation.setIpdBillingDetails(ipdBillingDetails);
+        ipdRoomAllocationRepository.save(roomAllocation);
+        
+        return ipdBillingDetails;
     }
 
  
 //----------------------------------------Update IPD Billing-------------------------------------------------//     
+
 //    @Override
 //    @Transactional
 //    public IPDBillingDetails updateIpdBill(IpdBillUpdateRequestDTO request) {
@@ -128,8 +150,9 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 //
 //        long daysAdmitted = Math.max(1, ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1);
 //
-//        // === DAILY CHARGES (scaled by days) ===
+//        // === DAILY CHARGES (scaled by full days admitted) ===
 //        double roomCharges = nullToZero(request.getRoomRatePerDay()) * daysAdmitted;
+////        double roomCharges = nullToZero(billing.getRoomCharges()) * daysAdmitted;
 //        double nursingCharges = nullToZero(request.getNursingChargesPerDay()) * daysAdmitted;
 //        double foodCharges = nullToZero(request.getFoodChargesPerDay()) * daysAdmitted;
 //        double diagnosticCharges = nullToZero(request.getDiagnosticChargesPerDay()) * daysAdmitted;
@@ -142,41 +165,48 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 //        // Pre-calculated miscellaneous from IPD module
 //        double totalMisc = nullToZero(request.getMiscellaneousCharges());
 //
-//        // === RECALCULATE AND UPDATE SERVICE CHARGES BASED ON IsDaily ===
+//     // === RECALCULATE SERVICE CHARGES WITH ACTUAL DAYS AND UPDATE QUANTITY ===
 //        List<IPDServiceUsage> serviceUsages = ipdServiceUsageRepository.findByIpdBillingDetailsId(billing.getId());
 //
-//        double serviceChargesBase = 0.0;     // Total base amount after scaling
-//        double totalGstFromServices = 0.0;   // Total GST after scaling
+//        double serviceChargesBase = 0.0;
+//        double totalGstFromServices = 0.0;
+//
+//        // Fixed: request.getDischargeDate() is LocalDate, no need for .toLocalDate()
+//        LocalDate dischargeLocalDate = request.getDischargeDate();
 //
 //        for (IPDServiceUsage usage : serviceUsages) {
 //            double price = nullToZero(usage.getPrice());
-//            int quantity = usage.getQuantity() != null ? usage.getQuantity() : 1;
-//            double originalBaseAmount = price * quantity;                    // price × quantity (for 1 day or one-time)
-//            double originalGstAmount = nullToZero(usage.getGstAmount());     // GST originally calculated when added
+//            int originalQuantity = usage.getQuantity() != null ? usage.getQuantity() : 1;
+//            double basePerDay = price * originalQuantity;
+//            double gstPerDay = nullToZero(usage.getGstAmount());
 //
 //            double newBaseAmount;
 //            double newGstAmount;
+//            int newQuantity = originalQuantity;
 //
 //            if (usage.getIsDaily() == IsDaily.YES) {
-//                // Scale both base and GST by number of days
-//                newBaseAmount = originalBaseAmount * daysAdmitted;
-//                newGstAmount = originalGstAmount * daysAdmitted;
+//                // serviceAddDate is LocalDateTime → .toLocalDate() is correct
+//                LocalDate serviceStartDate = usage.getServiceAddDate().toLocalDate();
+//                long daysActive = ChronoUnit.DAYS.between(serviceStartDate, dischargeLocalDate) + 1;
+//                daysActive = Math.max(1, daysActive);
+//
+//                newQuantity = (int) daysActive;
+//                newBaseAmount = basePerDay * daysActive;
+//                newGstAmount = gstPerDay * daysActive;
 //            } else {
-//                // One-time service → keep original values
-//                newBaseAmount = originalBaseAmount;
-//                newGstAmount = originalGstAmount;
+//                newBaseAmount = basePerDay;
+//                newGstAmount = gstPerDay;
 //            }
 //
-//            // === UPDATE THE ENTITY FIELDS IN DB ===
+//            usage.setQuantity(newQuantity);
 //            usage.setTotalAmount(round0(newBaseAmount));
 //            usage.setGstAmount(round0(newGstAmount));
 //
-//            // Accumulate for final billing totals
 //            serviceChargesBase += newBaseAmount;
 //            totalGstFromServices += newGstAmount;
 //        }
 //
-//        // Persist the updated totalAmount and gstAmount for each service row
+//        // Save updated services
 //        if (!serviceUsages.isEmpty()) {
 //            ipdServiceUsageRepository.saveAll(serviceUsages);
 //        }
@@ -202,9 +232,9 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 //
 //        double totalAfterDiscount = totalBeforeDiscount - discountAmount;
 //
-//        // === GST FROM SERVICES (now correctly scaled) ===
+//        // === GST ===
 //        billing.setTotalItemGstAmount(round0(totalGstFromServices));
-//        billing.setGstAmount(round0(totalGstFromServices)); // backward compatibility
+//        billing.setGstAmount(round0(totalGstFromServices));
 //
 //        // === FINAL TOTAL ===
 //        double finalTotal = round0(totalAfterDiscount + totalGstFromServices);
@@ -212,7 +242,7 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 //        billing.setTotal(finalTotal);
 //        billing.setTotalCharges(finalTotal);
 //
-//        // === UPDATE ALL CHARGE FIELDS ===
+//        // === UPDATE CHARGE FIELDS ===
 //        billing.setDaysAdmitted(daysAdmitted);
 //        billing.setRoomCharges(round0(roomCharges));
 //        billing.setMedicationCharges(round0(medicationCharges));
@@ -222,7 +252,7 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 //        billing.setProcedureCharges(round0(procedureCharges));
 //        billing.setFoodCharges(round0(foodCharges));
 //        billing.setMiscellaneousCharges(round0(totalMisc));
-//        billing.setServiceCharges(round0(serviceChargesBase)); // now correctly scaled
+//        billing.setServiceCharges(round0(serviceChargesBase));
 //
 //        // === DUE AMOUNT ===
 //        double advancePaid = nullToZero(billing.getAdvancePaid());
@@ -242,137 +272,167 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 //
 //        return ipdBillingRepository.save(billing);
 //    }
-//    
-//    private Double nullToZero(Double value) {
-//        return value != null ? value : 0.0;
-//    }
     
     @Override
     @Transactional
     public IPDBillingDetails updateIpdBill(IpdBillUpdateRequestDTO request) {
-        IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(request.getAdmissionId())
-                .orElseThrow(() -> new RuntimeException("No billing found for admission ID: " + request.getAdmissionId()));
 
-        // Prevent update if bill is already CLOSED
+        IPDBillingDetails billing = ipdBillingRepository
+                .findByAdmissionId(request.getAdmissionId())
+                .orElseThrow(() ->
+                        new RuntimeException("No billing found for admission ID: " + request.getAdmissionId()));
+
+        // ❌ Prevent update if bill is CLOSED
         if ("CLOSED".equals(billing.getBillingStatus())) {
-            throw new IllegalStateException("Cannot update a CLOSED bill for admission ID: " + request.getAdmissionId());
+            throw new IllegalStateException("Cannot update a CLOSED bill");
         }
 
-        long daysAdmitted = Math.max(1, ChronoUnit.DAYS.between(request.getAdmissionDate(), request.getDischargeDate()) + 1);
+        // ✅ Date validation
+        if (request.getDischargeDate().isBefore(request.getAdmissionDate())) {
+            throw new IllegalArgumentException("Discharge date cannot be before admission date");
+        }
 
-        // === DAILY CHARGES (scaled by full days admitted) ===
-        double roomCharges = nullToZero(request.getRoomRatePerDay()) * daysAdmitted;
-        double nursingCharges = nullToZero(request.getNursingChargesPerDay()) * daysAdmitted;
-        double foodCharges = nullToZero(request.getFoodChargesPerDay()) * daysAdmitted;
-        double diagnosticCharges = nullToZero(request.getDiagnosticChargesPerDay()) * daysAdmitted;
+        long daysAdmitted = Math.max(
+                1,
+                ChronoUnit.DAYS.between(
+                        request.getAdmissionDate(),
+                        request.getDischargeDate()
+                ) + 1
+        );
+        
+        /* ================= HANDLE ROOM ALLOCATION CHANGE ================= */
+        handleRoomAllocation(billing, request);
 
-        // === ONE-TIME / ACCUMULATED CHARGES (from request) ===
-        double medicationCharges = nullToZero(request.getMedicationCharges());
-        double doctorFees = nullToZero(request.getDoctorFee());
-        double procedureCharges = nullToZero(request.getProcedureCharges());
+        /* ================= RECALCULATE ROOM CHARGES FROM HISTORY ================= */
+        double roomCharges = calculateTotalRoomCharges(billing);  // ← THIS IS THE KEY FIX
 
-        // Pre-calculated miscellaneous from IPD module
-        double totalMisc = nullToZero(request.getMiscellaneousCharges());
+        /* ================= DAILY CHARGES ================= */
+//        double roomCharges        = nullToZero(request.getRoomRatePerDay()) * daysAdmitted;
+        double nursingCharges     = nullToZero(request.getNursingChargesPerDay()) * daysAdmitted;
+        double foodCharges        = nullToZero(request.getFoodChargesPerDay()) * daysAdmitted;
+        double diagnosticCharges  = nullToZero(request.getDiagnosticChargesPerDay()) * daysAdmitted;
 
-     // === RECALCULATE SERVICE CHARGES WITH ACTUAL DAYS AND UPDATE QUANTITY ===
-        List<IPDServiceUsage> serviceUsages = ipdServiceUsageRepository.findByIpdBillingDetailsId(billing.getId());
+        /* ================= ONE-TIME CHARGES ================= */
+        double medicationCharges  = nullToZero(request.getMedicationCharges());
+        double doctorFees         = nullToZero(request.getDoctorFee());
+        double procedureCharges   = nullToZero(request.getProcedureCharges());
+        double totalMisc          = nullToZero(request.getMiscellaneousCharges());
+
+        /* ================= SERVICE CHARGES (FIXED) ================= */
+        List<IPDServiceUsage> serviceUsages =
+                ipdServiceUsageRepository.findByIpdBillingDetailsId(billing.getId());
 
         double serviceChargesBase = 0.0;
-        double totalGstFromServices = 0.0;
+        double totalServiceGst    = 0.0;
 
-        // Fixed: request.getDischargeDate() is LocalDate, no need for .toLocalDate()
-        LocalDate dischargeLocalDate = request.getDischargeDate();
+        LocalDate dischargeDate = request.getDischargeDate();
 
         for (IPDServiceUsage usage : serviceUsages) {
-            double price = nullToZero(usage.getPrice());
-            int originalQuantity = usage.getQuantity() != null ? usage.getQuantity() : 1;
-            double basePerDay = price * originalQuantity;
-            double gstPerDay = nullToZero(usage.getGstAmount());
 
-            double newBaseAmount;
-            double newGstAmount;
-            int newQuantity = originalQuantity;
+            double price = nullToZero(usage.getPrice());
+            int baseQuantity = usage.getQuantity() != null ? usage.getQuantity() : 1;
+
+            // 🔑 GST MUST be calculated from GST %
+            double gstPercentage = nullToZero(usage.getGstPercentage());
+
+            int finalQuantity = baseQuantity;
+            double baseAmount;
+            double gstAmount;
 
             if (usage.getIsDaily() == IsDaily.YES) {
-                // serviceAddDate is LocalDateTime → .toLocalDate() is correct
-                LocalDate serviceStartDate = usage.getServiceAddDate().toLocalDate();
-                long daysActive = ChronoUnit.DAYS.between(serviceStartDate, dischargeLocalDate) + 1;
-                daysActive = Math.max(1, daysActive);
 
-                newQuantity = (int) daysActive;
-                newBaseAmount = basePerDay * daysActive;
-                newGstAmount = gstPerDay * daysActive;
+                LocalDate serviceStartDate =
+                        usage.getServiceAddDate().toLocalDate();
+
+                long daysActive = Math.max(
+                        1,
+                        ChronoUnit.DAYS.between(serviceStartDate, dischargeDate) + 1
+                );
+
+                finalQuantity = (int) daysActive;
+
+                baseAmount = price * finalQuantity;
+                gstAmount  = baseAmount * gstPercentage / 100.0;
+
             } else {
-                newBaseAmount = basePerDay;
-                newGstAmount = gstPerDay;
+
+                baseAmount = price * baseQuantity;
+                gstAmount  = baseAmount * gstPercentage / 100.0;
             }
 
-            usage.setQuantity(newQuantity);
-            usage.setTotalAmount(round0(newBaseAmount));
-            usage.setGstAmount(round0(newGstAmount));
+            usage.setQuantity(finalQuantity);
+            usage.setTotalAmount(round0(baseAmount));
+            usage.setGstAmount(round0(gstAmount));
 
-            serviceChargesBase += newBaseAmount;
-            totalGstFromServices += newGstAmount;
+            serviceChargesBase += baseAmount;
+            totalServiceGst    += gstAmount;
         }
 
-        // Save updated services
         if (!serviceUsages.isEmpty()) {
             ipdServiceUsageRepository.saveAll(serviceUsages);
         }
 
-        // === NEW TOTAL BEFORE DISCOUNT ===
-        double totalBeforeDiscount = roomCharges +
-                                     medicationCharges +
-                                     doctorFees +
-                                     nursingCharges +
-                                     diagnosticCharges +
-                                     procedureCharges +
-                                     foodCharges +
-                                     totalMisc +
-                                     serviceChargesBase;
+        /* ================= TOTAL BEFORE DISCOUNT ================= */
+        double totalBeforeDiscount =
+                roomCharges +
+                nursingCharges +
+                foodCharges +
+                diagnosticCharges +
+                medicationCharges +
+                doctorFees +
+                procedureCharges +
+                totalMisc +
+                serviceChargesBase;
 
         billing.setTotalBeforeDiscount(round0(totalBeforeDiscount));
 
-        // === DISCOUNT ===
+        /* ================= DISCOUNT ================= */
         double discountPercentage = nullToZero(request.getDiscountPercentage());
-        double discountAmount = round0(totalBeforeDiscount * discountPercentage / 100.0);
-        billing.setDiscountAmount(discountAmount);
+        double discountAmount =
+                round0(totalBeforeDiscount * discountPercentage / 100.0);
+
         billing.setDiscountPercentage(discountPercentage);
+        billing.setDiscountAmount(discountAmount);
 
         double totalAfterDiscount = totalBeforeDiscount - discountAmount;
 
-        // === GST ===
-        billing.setTotalItemGstAmount(round0(totalGstFromServices));
-        billing.setGstAmount(round0(totalGstFromServices));
+        /* ================= GST ================= */
+        billing.setTotalItemGstAmount(round0(totalServiceGst));
+        billing.setGstAmount(round0(totalServiceGst));
 
-        // === FINAL TOTAL ===
-        double finalTotal = round0(totalAfterDiscount + totalGstFromServices);
-        billing.setTotalAfterDiscountAndGst(finalTotal);
+        /* ================= FINAL TOTAL ================= */
+        double finalTotal =
+                round0(totalAfterDiscount + totalServiceGst);
+
         billing.setTotal(finalTotal);
         billing.setTotalCharges(finalTotal);
+        billing.setTotalAfterDiscountAndGst(finalTotal);
 
-        // === UPDATE CHARGE FIELDS ===
+        /* ================= UPDATE CHARGES ================= */
         billing.setDaysAdmitted(daysAdmitted);
         billing.setRoomCharges(round0(roomCharges));
+        billing.setNursingCharges(round0(nursingCharges));
+        billing.setFoodCharges(round0(foodCharges));
+        billing.setDiagnosticCharges(round0(diagnosticCharges));
         billing.setMedicationCharges(round0(medicationCharges));
         billing.setDoctorFees(round0(doctorFees));
-        billing.setNursingCharges(round0(nursingCharges));
-        billing.setDiagnosticCharges(round0(diagnosticCharges));
         billing.setProcedureCharges(round0(procedureCharges));
-        billing.setFoodCharges(round0(foodCharges));
         billing.setMiscellaneousCharges(round0(totalMisc));
         billing.setServiceCharges(round0(serviceChargesBase));
 
-        // === DUE AMOUNT ===
-        double advancePaid = nullToZero(billing.getAdvancePaid());
-        double totalPayments = nullToZero(billing.getTotalPayments());
-        double newDueAmount = round0(finalTotal - (advancePaid + totalPayments));
-        billing.setDueAmount(newDueAmount);
+        /* ================= DUE AMOUNT ================= */
+        double advancePaid  = nullToZero(billing.getAdvancePaid());
+        double totalPaid    = nullToZero(billing.getTotalPayments());
+
+        double dueAmount =
+                round0(finalTotal - (advancePaid + totalPaid));
+
+        billing.setDueAmount(dueAmount);
 
         billing.setBillingStatus("ACTIVE");
         billing.setUpdatedAt(LocalDateTime.now());
 
-        // === Update BillingMaster ===
+        /* ================= BILLING MASTER ================= */
         BillingMaster master = billing.getBillingMaster();
         if (master != null) {
             master.setTotalAmount(finalTotal);
@@ -381,10 +441,111 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 
         return ipdBillingRepository.save(billing);
     }
+
     
   private Double nullToZero(Double value) {
   return value != null ? value : 0.0;
 }
+  
+  
+  /**
+   * Handles room change logic:
+   * - If current room/bed is different from active allocation → close old, create new
+   * - If same → do nothing
+   */
+  private void handleRoomAllocation(IPDBillingDetails billing, IpdBillUpdateRequestDTO request) {
+      String newRoomNumber = request.getRoomNumber();
+      Integer newBedNumber = request.getBedNumber();
+      Double newPricePerDay = request.getRoomRatePerDay();
+
+      if (newRoomNumber == null || newBedNumber == null || newPricePerDay == null) {
+          // If not provided, skip room handling (fallback to old behavior)
+          return;
+      }
+
+      // Find currently active allocation (releaseDate IS NULL)
+      Optional<IPDRoomAllocation> activeAllocOpt = ipdRoomAllocationRepository
+              .findByIpdBillingDetailsAndReleaseDateIsNull(billing);
+
+      boolean isRoomChanged = true;
+
+      if (activeAllocOpt.isPresent()) {
+          IPDRoomAllocation active = activeAllocOpt.get();
+          // Same room & bed → no change needed
+          if (Objects.equals(active.getRoomNumber(), newRoomNumber) &&
+              Objects.equals(active.getBedNumber(), newBedNumber)) {
+              isRoomChanged = false;
+          }
+      }
+
+      if (isRoomChanged) {
+          // Close previous active allocation if exists
+          if (activeAllocOpt.isPresent()) {
+              IPDRoomAllocation old = activeAllocOpt.get();
+              old.setReleaseDate(LocalDateTime.now());
+              ipdRoomAllocationRepository.save(old);
+          }
+
+          // Create new allocation
+          IPDRoomAllocation newAllocation = new IPDRoomAllocation();
+          newAllocation.setIpdBillingDetails(billing);
+          newAllocation.setRoomNumber(newRoomNumber);
+          newAllocation.setBedNumber(newBedNumber);
+          newAllocation.setBedPricePerDay(newPricePerDay);
+          newAllocation.setAllocationDate(LocalDateTime.now());
+          newAllocation.setReleaseDate(null); // current active
+          newAllocation.setDaysAdmitted(null); // will be calculated later
+          newAllocation.setTotalRoomCharges(null);
+
+          ipdRoomAllocationRepository.save(newAllocation);
+      }
+  }
+
+  /**
+   * Calculates total room charges from all allocations (past + current)
+   * Uses allocationDate → today (or releaseDate if closed)
+   */
+  private double calculateTotalRoomCharges(IPDBillingDetails billing) {
+      List<IPDRoomAllocation> allocations = ipdRoomAllocationRepository
+              .findByIpdBillingDetails(billing);
+
+      if (allocations.isEmpty()) {
+          return 0.0;
+      }
+
+      LocalDate today = LocalDate.now();
+      double total = 0.0;
+
+      for (IPDRoomAllocation alloc : allocations) {
+          LocalDate start = alloc.getAllocationDate().toLocalDate();
+          LocalDate end;
+
+          if (alloc.getReleaseDate() == null) {
+              end = today; // current room → up to today
+          } else {
+              end = alloc.getReleaseDate().toLocalDate();
+          }
+
+          long days = Math.max(1, ChronoUnit.DAYS.between(start, end) + 1);
+          double charge = nullToZero(alloc.getBedPricePerDay()) * days;
+          total += charge;
+
+          // Optional: update entity fields for audit
+          alloc.setDaysAdmitted(days);
+          alloc.setTotalRoomCharges(round0(charge));
+      }
+
+      // Save updated days & charges
+      ipdRoomAllocationRepository.saveAll(allocations);
+
+      return round0(total);
+  }
+
+  // Add this custom repository method in IPDRoomAllocationRepository
+  // public interface IPDRoomAllocationRepository extends JpaRepository<IPDRoomAllocation, Long> {
+  //     List<IPDRoomAllocation> findByIpdBillingDetails(IPDBillingDetails billing);
+  //     Optional<IPDRoomAllocation> findByIpdBillingDetailsAndReleaseDateIsNull(IPDBillingDetails billing);
+  // }
     
 //----------------------------------------Close IPD Billing-------------------------------------------------//    
 //    @Override
@@ -623,14 +784,104 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 //        ipdBillingRepository.save(billing);
 //    }
     
+//    @Override
+//    @Transactional
+//    public void makePartialPayment(IpdPartialPaymentRequestDTO request) {
+//        IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(request.getAdmissionId())
+//            .orElseThrow(() -> new RuntimeException("Billing not found for admission ID: " + request.getAdmissionId()));
+//
+//        // Only block if patient already discharged
+//        if ("CLOSED".equals(billing.getBillingStatus())) {
+//            throw new IllegalStateException("Patient is already discharged. Cannot accept payment.");
+//        }
+//
+//        double amount = request.getAmount();
+//        if (amount <= 0) {
+//            throw new IllegalArgumentException("Payment amount must be greater than zero");
+//        }
+//
+//        // === DETERMINE WHICH DUE TO USE ===
+//        boolean hasSpecialDiscount = billing.getDueAfterSpecialDiscount() != null && billing.getDueAfterSpecialDiscount() > 0;
+//        double effectiveDue = hasSpecialDiscount 
+//                ? billing.getDueAfterSpecialDiscount() 
+//                : billing.getDueAmount();
+//
+//        if (effectiveDue <= 0.01) {
+//            throw new IllegalArgumentException("No pending due amount to pay.");
+//        }
+//
+//        if (amount > effectiveDue) {
+//            throw new IllegalArgumentException(
+//                "Amount exceeds pending due of ₹" + String.format("%.2f", effectiveDue)
+//            );
+//        }
+//
+//        // === RECORD PAYMENT HISTORY ===
+//        IpdPaymentHistory history = IpdPaymentHistory.builder()
+//            .admissionId(request.getAdmissionId())
+//            .amount(amount)
+//            .paymentMode(request.getPaymentMode())
+//            .paymentDate(LocalDateTime.now())
+//            .paidBy("Counter Staff")
+//            .receiptNo("REC" + System.currentTimeMillis())
+//            .billingDetails(billing)
+//            .createdAt(LocalDateTime.now())
+//            .build();
+//
+//        if (billing.getPaymentHistory() == null) {
+//            billing.setPaymentHistory(new ArrayList<>());
+//        }
+//        billing.getPaymentHistory().add(history);
+//
+//        // === INCREASE TOTAL PAYMENTS (always - for audit) ===
+//        double newTotalPayments = (nullToZero(billing.getTotalPayments()) + amount);
+//        billing.setTotalPayments(round0(newTotalPayments));
+//
+//        // === REDUCE THE CORRECT DUE FIELD ===
+//        if (hasSpecialDiscount) {
+//            // ONLY reduce due_after_special_discount
+//            double newEffectiveDue = billing.getDueAfterSpecialDiscount() - amount;
+//            billing.setDueAfterSpecialDiscount(round0(Math.max(0, newEffectiveDue)));
+//            
+//            // DO NOT update due_amount — keep it as original full due
+//        } else {
+//            // No special discount → reduce normal due_amount
+//            double newDue = billing.getDueAmount() - amount;
+//            billing.setDueAmount(round0(Math.max(0, newDue)));
+//        }
+//
+//        // === UPDATE PAYMENT STATUS BASED ON EFFECTIVE DUE ===
+//        BillingMaster master = billing.getBillingMaster();
+//        if (master != null) {
+//            master.setPaymentMode(PaymentMode.valueOf(request.getPaymentMode()));
+//            
+//            if (effectiveDue - amount <= 0.01) {
+//                master.setPaymentStatus(PaymentStatus.PAID);
+//            } else if (newTotalPayments > 0 || nullToZero(billing.getAdvancePaid()) > 0) {
+//                master.setPaymentStatus(PaymentStatus.PARTIAL);
+//            } else {
+//                master.setPaymentStatus(PaymentStatus.PENDING);
+//            }
+//            
+//            billingMasterRepository.save(master);
+//        }
+//
+//        // Save changes
+//        ipdPaymentHistoryRepository.save(history);
+//        ipdBillingRepository.save(billing);
+//    }
+
     @Override
     @Transactional
     public void makePartialPayment(IpdPartialPaymentRequestDTO request) {
-        IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(request.getAdmissionId())
-            .orElseThrow(() -> new RuntimeException("Billing not found for admission ID: " + request.getAdmissionId()));
 
-        // Only block if patient already discharged
-        if ("CLOSED".equals(billing.getBillingStatus())) {
+        IPDBillingDetails billing = ipdBillingRepository
+                .findByAdmissionId(request.getAdmissionId())
+                .orElseThrow(() ->
+                        new RuntimeException("Billing not found for admission ID: " + request.getAdmissionId()));
+
+        // ❌ Block payment if billing already closed
+        if ("CLOSED".equalsIgnoreCase(billing.getBillingStatus())) {
             throw new IllegalStateException("Patient is already discharged. Cannot accept payment.");
         }
 
@@ -639,11 +890,15 @@ public class IPDBillingServiceImpl implements IPDBillingService {
             throw new IllegalArgumentException("Payment amount must be greater than zero");
         }
 
-        // === DETERMINE WHICH DUE TO USE ===
-        boolean hasSpecialDiscount = billing.getDueAfterSpecialDiscount() != null && billing.getDueAfterSpecialDiscount() > 0;
-        double effectiveDue = hasSpecialDiscount 
-                ? billing.getDueAfterSpecialDiscount() 
-                : billing.getDueAmount();
+        // ✅ CHECK IF SPECIAL DISCOUNT IS APPLIED
+        boolean hasSpecialDiscount =
+                (nullToZero(billing.getSpecialDiscountPercentage()) > 0)
+             || (nullToZero(billing.getSpecialDiscountAmount()) > 0);
+
+        // ✅ DETERMINE EFFECTIVE DUE
+        double effectiveDue = hasSpecialDiscount
+                ? nullToZero(billing.getDueAfterSpecialDiscount())
+                : nullToZero(billing.getDueAmount());
 
         if (effectiveDue <= 0.01) {
             throw new IllegalArgumentException("No pending due amount to pay.");
@@ -651,49 +906,47 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 
         if (amount > effectiveDue) {
             throw new IllegalArgumentException(
-                "Amount exceeds pending due of ₹" + String.format("%.2f", effectiveDue)
-            );
+                    "Amount exceeds pending due of ₹" + String.format("%.2f", effectiveDue));
         }
 
-        // === RECORD PAYMENT HISTORY ===
+        // ✅ RECORD PAYMENT HISTORY
         IpdPaymentHistory history = IpdPaymentHistory.builder()
-            .admissionId(request.getAdmissionId())
-            .amount(amount)
-            .paymentMode(request.getPaymentMode())
-            .paymentDate(LocalDateTime.now())
-            .paidBy("Counter Staff")
-            .receiptNo("REC" + System.currentTimeMillis())
-            .billingDetails(billing)
-            .createdAt(LocalDateTime.now())
-            .build();
+                .admissionId(request.getAdmissionId())
+                .amount(amount)
+                .paymentMode(request.getPaymentMode())
+                .paymentDate(LocalDateTime.now())
+                .paidBy("Counter Staff")
+                .receiptNo("REC" + System.currentTimeMillis())
+                .billingDetails(billing)
+                .createdAt(LocalDateTime.now())
+                .build();
 
         if (billing.getPaymentHistory() == null) {
             billing.setPaymentHistory(new ArrayList<>());
         }
         billing.getPaymentHistory().add(history);
 
-        // === INCREASE TOTAL PAYMENTS (always - for audit) ===
-        double newTotalPayments = (nullToZero(billing.getTotalPayments()) + amount);
+        // ✅ UPDATE TOTAL PAYMENTS (AUDIT SAFE)
+        double newTotalPayments = nullToZero(billing.getTotalPayments()) + amount;
         billing.setTotalPayments(round0(newTotalPayments));
 
-        // === REDUCE THE CORRECT DUE FIELD ===
+        // ✅ REDUCE ONLY THE CORRECT DUE FIELD
         if (hasSpecialDiscount) {
-            // ONLY reduce due_after_special_discount
-            double newEffectiveDue = billing.getDueAfterSpecialDiscount() - amount;
-            billing.setDueAfterSpecialDiscount(round0(Math.max(0, newEffectiveDue)));
-            
-            // DO NOT update due_amount — keep it as original full due
+            // 🔒 Reduce ONLY due_after_special_discount
+            double newDueAfterDiscount = billing.getDueAfterSpecialDiscount() - amount;
+            billing.setDueAfterSpecialDiscount(round0(Math.max(0, newDueAfterDiscount)));
+            // ❌ DO NOT touch dueAmount
         } else {
-            // No special discount → reduce normal due_amount
+            // 🔓 No discount → reduce normal due_amount
             double newDue = billing.getDueAmount() - amount;
             billing.setDueAmount(round0(Math.max(0, newDue)));
         }
 
-        // === UPDATE PAYMENT STATUS BASED ON EFFECTIVE DUE ===
+        // ✅ UPDATE PAYMENT STATUS
         BillingMaster master = billing.getBillingMaster();
         if (master != null) {
             master.setPaymentMode(PaymentMode.valueOf(request.getPaymentMode()));
-            
+
             if (effectiveDue - amount <= 0.01) {
                 master.setPaymentStatus(PaymentStatus.PAID);
             } else if (newTotalPayments > 0 || nullToZero(billing.getAdvancePaid()) > 0) {
@@ -701,11 +954,11 @@ public class IPDBillingServiceImpl implements IPDBillingService {
             } else {
                 master.setPaymentStatus(PaymentStatus.PENDING);
             }
-            
+
             billingMasterRepository.save(master);
         }
 
-        // Save changes
+        // ✅ SAVE CHANGES
         ipdPaymentHistoryRepository.save(history);
         ipdBillingRepository.save(billing);
     }
@@ -719,6 +972,7 @@ public class IPDBillingServiceImpl implements IPDBillingService {
                 .orElseThrow(() -> new RuntimeException("No billing found for admission ID: " + admissionId));
         
         List<IPDServiceUsage> serviceList=  ipdServiceUsageRepository.findByIpdBillingDetailsId(details.getId());
+        List<IPDRoomAllocation> ipdRooms = ipdRoomAllocationRepository.findByIpdBillingDetailsId(details.getId());
         
         IpdBillingDetailsResponse response = new IpdBillingDetailsResponse();
         response.setId(details.getId());
@@ -734,6 +988,7 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         response.setDaysAdmitted(details.getDaysAdmitted());
         response.setTotal(details.getTotal());
         response.setIpdServices(serviceList);
+        response.setIpdRooms(ipdRooms);
         response.setServiceCharges(details.getServiceCharges());
         response.setDiscountAmount(details.getDiscountAmount());
         response.setDiscountPercentage(details.getDiscountPercentage());

@@ -13,6 +13,8 @@ public class IpdBillUpdateRequestDTO {
     private LocalDate dischargeDate; // today if not discharged
 
     // Daily fixed charges from hospital pricing
+    private String roomNumber;
+    private Integer bedNumber;
     private Double roomRatePerDay;
     private Double nursingChargesPerDay;
     private Double foodChargesPerDay;

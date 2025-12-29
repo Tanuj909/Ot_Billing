@@ -27,7 +27,8 @@ public class IpdBillRequestDTO {
     private LocalDate dischargeDate;
     private Long daysAdmitted;
     
-    
+    private Integer bedNumber;
+    private String roomNumber;
     private Double roomRatePerDay;
     private Double doctorFee;
     private Double medicationCharges;
