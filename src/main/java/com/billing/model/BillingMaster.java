@@ -45,6 +45,8 @@ public class BillingMaster {
 	
 	private Long emergencyId;
 	
+	private Long labOrderId;
+	
 //	@ManyToOne
 //	@JoinColumn(name = "patient_id")
 //	private Patient patient;
