@@ -8,9 +8,9 @@ public interface LabBillingService {
 
     void makePayment(LabPaymentRequest request);
 
-    void applyDiscount(LabDiscountRequest request);
+    LabDiscountResponse applyDiscount(LabDiscountRequest request);
 
-    void removeDiscount(RemoveLabDiscountRequest request);
+    LabDiscountResponse removeDiscount(RemoveLabDiscountRequest request);
 
     LabBillResponse getBillByLabOrder(Long labOrderId);
 }

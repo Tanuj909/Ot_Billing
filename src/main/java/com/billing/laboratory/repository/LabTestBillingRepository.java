@@ -9,6 +9,8 @@ import com.billing.laboratory.entity.LabTestBilling;
 
 public interface LabTestBillingRepository extends JpaRepository<LabTestBilling, Long>{
 
-	List<LabTestBillItemDTO> findByLabBillingDetailsId(Long id);
+//	List<LabTestBillItemDTO> findByLabBillingDetailsId(Long id);
+	List<LabTestBilling> findByLabBillingDetailsId(Long billingDetailsId);
+
 
 }

@@ -29,17 +29,22 @@ public class LabBillingController {
     }
 
     @PostMapping("/discount")
-    public ResponseEntity<Void> applyDiscount(
+    public ResponseEntity<LabDiscountResponse> applyDiscount(
             @RequestBody LabDiscountRequest request) {
-        labBillingService.applyDiscount(request);
-        return ResponseEntity.ok().build();
+
+        LabDiscountResponse response =
+                labBillingService.applyDiscount(request);
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/discount/remove")
-    public ResponseEntity<Void> removeDiscount(
+    public ResponseEntity<LabDiscountResponse> removeDiscount(
             @RequestBody RemoveLabDiscountRequest request) {
         labBillingService.removeDiscount(request);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(
+        		labBillingService.removeDiscount(request)
+        );
     }
 
 

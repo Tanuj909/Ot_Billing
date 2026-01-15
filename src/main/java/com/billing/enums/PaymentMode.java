@@ -6,6 +6,4 @@ public enum PaymentMode {
     UPI,
     NET_BANKING,
     CHEQUE
-
-
 }

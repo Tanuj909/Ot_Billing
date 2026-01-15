@@ -18,6 +18,10 @@ public class LabBillResponse {
 
     private String paymentStatus;
     private String billingStatus;
+    
+	private Double testGstAmount;
+	private Double discountPercentage;
+	private Double discountAmount;
 
     private List<LabTestBillItemDTO> tests;
 }
