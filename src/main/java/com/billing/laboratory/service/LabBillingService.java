@@ -13,4 +13,6 @@ public interface LabBillingService {
     LabDiscountResponse removeDiscount(RemoveLabDiscountRequest request);
 
     LabBillResponse getBillByLabOrder(Long labOrderId);
+
+	BillingRevenueResponseDTO getRevenueSummary(RevenueSummaryRequest request);
 }

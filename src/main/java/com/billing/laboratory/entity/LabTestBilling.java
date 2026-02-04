@@ -31,7 +31,7 @@ public class LabTestBilling {
     private Long id;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "emergency_billing_id", nullable = false)
+    @JoinColumn(name = "lab_billing_id", nullable = false)
     @JsonIgnore
     private LabBillingDetails labBillingDetails;
 	

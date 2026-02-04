@@ -53,4 +53,15 @@ public class LabBillingController {
             @PathVariable Long labOrderId) {
         return ResponseEntity.ok(labBillingService.getBillByLabOrder(labOrderId));
     }
+    
+    
+    @PostMapping("/revenue/summary")
+    public ResponseEntity<BillingRevenueResponseDTO> getRevenueSummary(
+            @RequestBody RevenueSummaryRequest request
+    ) {
+        return ResponseEntity.ok(
+                labBillingService.getRevenueSummary(request)
+        );
+    }
+
 }

@@ -2,6 +2,7 @@ package com.billing.laboratory.serviceImpl;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -37,8 +38,10 @@ public class LabBillingServiceImpl implements LabBillingService {
 
         // 1. Create Billing Master (authoritative)
         BillingMaster billingMaster = BillingMaster.builder()
-                .hospitaExternallId(request.getHospitalExternalId())
+        		.hospitaExternallId(request.getHospitaExternallId())
+                .labStoreId(request.getStoreId())
                 .patientExternalId(request.getPatientExternalId())
+                .billingDate(LocalDateTime.now())
                 .labOrderId(request.getLabOrderId())
                 .moduleType("LAB")
                 .paymentStatus(PaymentStatus.PENDING)
@@ -105,35 +108,6 @@ public class LabBillingServiceImpl implements LabBillingService {
                 .build();
     }
 
-
-//    @Override
-//    public void makePayment(LabPaymentRequest request) {
-//
-//        LabBillingDetails billing = labBillingRepo.findById(request.getLabBillingId())
-//                .orElseThrow(() -> new RuntimeException("Lab Billing not found"));
-//        
-//        if(request.getAmountPaid()>billing.getDue()) {
-//        	throw new RuntimeException("Amount can not be higher than the Due!");
-//        }
-//
-//        double paid = AmountUtil.round(
-//        	    billing.getTotalPayment() + request.getAmountPaid()
-//        	);
-//
-//        	double due = AmountUtil.round(
-//        	    billing.getTestCharges() - paid
-//        	);
-//
-//        	billing.setTotalPayment(paid);
-//        	billing.setDue(due);
-//
-//
-//        if (due <= 0) {
-//            billing.getBillingMaster().setPaymentStatus(PaymentStatus.PAID);
-//        } else {
-//            billing.getBillingMaster().setPaymentStatus(PaymentStatus.PARTIAL);
-//        }
-//    }
     
     @Override
     @Transactional
@@ -186,37 +160,6 @@ public class LabBillingServiceImpl implements LabBillingService {
         labBillingRepo.save(billing);
     }
 
-
-//    @Override
-//    public void applyDiscount(LabDiscountRequest request) {
-//
-//        LabBillingDetails billing = labBillingRepo.findById(request.getLabBillingId())
-//                .orElseThrow(() -> new RuntimeException("Lab Billing not found"));
-//
-//        double originalAmount = billing.getTestCharges();
-//        double discountAmount = 0.0;
-//
-//        if (request.getDiscountPercentage() != null) {
-//            discountAmount = (originalAmount * request.getDiscountPercentage()) / 100;
-//            billing.setDiscountPercentage(request.getDiscountPercentage());
-//        }
-//
-//        if (request.getDiscountAmount() != null) {
-//            discountAmount = request.getDiscountAmount();
-//            billing.setDiscountPercentage(null);
-//        }
-//
-//        discountAmount = AmountUtil.round(discountAmount);
-//
-//        double newTotal = AmountUtil.round(originalAmount - discountAmount);
-//
-//        billing.setDiscountAmount(discountAmount);
-//        billing.setTestCharges(newTotal);
-//
-//        billing.setDue(
-//            AmountUtil.round(newTotal - billing.getTotalPayment())
-//        );
-//    }
     
     @Override
     @Transactional
@@ -339,6 +282,67 @@ public class LabBillingServiceImpl implements LabBillingService {
 //                .status(entity.getStatus())
                 .build();
     }
+    
+    
+    @Override
+    public BillingRevenueResponseDTO getRevenueSummary(
+            RevenueSummaryRequest request
+    ) {
+
+        List<Object[]> rows = billingMasterRepo.getStoreWiseRevenue(
+                request.getStoreIds(),
+                request.getStartDate(),
+                request.getEndDate()
+        );
+
+        double totalRevenue = 0;
+        long totalOrders = 0;
+
+        List<StoreRevenueDTO> storeWise = new ArrayList<>();
+
+        for (Object[] r : rows) {
+
+            Long storeId = ((Number) r[0]).longValue();
+            double revenue = ((Number) r[1]).doubleValue();
+            long orders = ((Number) r[2]).longValue();
+
+            double avgOrder =
+                    orders > 0 ? revenue / orders : 0.0;
+
+            storeWise.add(
+                    new StoreRevenueDTO(
+                            storeId,
+                            round(revenue),
+                            orders,
+                            round(avgOrder)
+                    )
+            );
+
+            totalRevenue += revenue;
+            totalOrders += orders;
+        }
+
+        double avgHospitalOrder =
+                totalOrders > 0 ? totalRevenue / totalOrders : 0.0;
+
+        return BillingRevenueResponseDTO.builder()
+                .fromDate(request.getStartDate().toLocalDate().toString())
+                .toDate(request.getEndDate().toLocalDate().toString())
+                .summary(
+                        new RevenueSummaryDTO(
+                                round(totalRevenue),
+                                totalOrders,
+                                round(avgHospitalOrder)
+                        )
+                )
+                .storeWise(storeWise)
+                .build();
+    }
+
+    private double round(double v) {
+        return Math.round(v * 100.0) / 100.0;
+    }
+
 
 
 

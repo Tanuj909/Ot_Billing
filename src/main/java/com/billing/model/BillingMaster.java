@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import com.billing.enums.PaymentMode;
 import com.billing.enums.PaymentStatus;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -36,6 +37,9 @@ public class BillingMaster {
 //	private Hospital hospital;
 	
 	private Long hospitaExternallId;
+	
+	@Column(name = "lab_store_id")
+	private Long labStoreId;
 	
 	private Long patientExternalId;
 	

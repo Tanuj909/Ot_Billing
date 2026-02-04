@@ -6,7 +6,8 @@ import lombok.Data;
 @Data
 public class GenerateLabBillRequest {
 
-    private Long hospitalExternalId;
+    private Long hospitaExternallId;
+    private Long storeId;
     private Long patientExternalId;
     private Long labOrderId;
 
