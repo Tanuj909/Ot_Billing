@@ -109,6 +109,95 @@ public class LabBillingServiceImpl implements LabBillingService {
     }
 
     
+    @Transactional
+    @Override
+    public GenerateLabBillResponse updateBill(GenerateLabBillRequest request) {
+
+        // 1️⃣ Fetch EXISTING BillingMaster (NO NEW CREATE)
+        BillingMaster billingMaster =
+                billingMasterRepo
+                        .findByLabOrderIdAndPaymentStatus(
+                                request.getLabOrderId(),
+                                PaymentStatus.PENDING
+                        )
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Active billing master not found for order"
+                                )
+                        );
+
+        // 🚫 Safety: PAID bill cannot be modified
+        if (billingMaster.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new IllegalStateException("Cannot update a PAID bill");
+        }
+
+        // 2️⃣ Fetch existing LabBillingDetails
+        LabBillingDetails labBilling =
+                labBillingRepo.findByBillingMaster(billingMaster)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Lab billing details not found"
+                                )
+                        );
+
+        // 3️⃣ DELETE OLD TEST ROWS
+        labTestBillingRepo.deleteByLabBillingDetails(labBilling);
+
+        // 4️⃣ Recalculate tests
+        double billTotal = 0.0;
+        double totalGst = 0.0;
+
+        for (LabTestBillItemDTO dto : request.getTests()) {
+
+            double price = dto.getPrice();
+            double gstPercentage =
+                    dto.getGstPercentage() != null ? dto.getGstPercentage() : 0.0;
+
+            double gstAmount = gstPercentage > 0
+                    ? AmountUtil.round((price * gstPercentage) / 100)
+                    : 0.0;
+
+            double testTotal = AmountUtil.round(price + gstAmount);
+
+            LabTestBilling testBilling = LabTestBilling.builder()
+                    .labBillingDetails(labBilling)
+                    .testName(dto.getTestName())
+                    .price(price)
+                    .gstPercentage(gstPercentage)
+                    .gstAmount(BigDecimal.valueOf(gstAmount))
+                    .totalAmount(testTotal)
+                    .build();
+
+            labTestBillingRepo.save(testBilling);
+
+            billTotal += testTotal;
+            totalGst += gstAmount;
+        }
+
+        billTotal = AmountUtil.round(billTotal);
+        totalGst = AmountUtil.round(totalGst);
+
+        // 5️⃣ UPDATE SAME LabBillingDetails
+        labBilling.setTestCharges(billTotal);
+        labBilling.setTestGstAmount(totalGst);
+        labBilling.setDue(billTotal);
+        labBilling.setUpdatedAt(LocalDateTime.now());
+
+        // 6️⃣ UPDATE SAME BillingMaster
+        billingMaster.setTotalAmount(billTotal);
+        billingMaster.setUpdatedAt(LocalDateTime.now());
+
+        // 7️⃣ RESPONSE
+        return GenerateLabBillResponse.builder()
+                .billingId(billingMaster.getId())
+                .labBillingId(labBilling.getId())
+                .totalAmount(billTotal)
+                .dueAmount(billTotal)
+                .billingStatus(labBilling.getBillingStatus())
+                .build();
+    }
+
+    
     @Override
     @Transactional
     public void makePayment(LabPaymentRequest request) {

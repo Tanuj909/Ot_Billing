@@ -15,4 +15,6 @@ public interface LabBillingService {
     LabBillResponse getBillByLabOrder(Long labOrderId);
 
 	BillingRevenueResponseDTO getRevenueSummary(RevenueSummaryRequest request);
+
+	GenerateLabBillResponse updateBill(GenerateLabBillRequest request);
 }

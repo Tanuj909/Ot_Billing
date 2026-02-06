@@ -69,4 +69,7 @@ public class BillingMaster {
 	private String advancePaymentMode;
 	
 	private LocalDateTime billingDate = LocalDateTime.now();
+	
+	@Column(name = "updated_at")
+	private LocalDateTime updatedAt;
 }

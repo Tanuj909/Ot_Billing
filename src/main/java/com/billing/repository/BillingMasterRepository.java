@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.billing.enums.PaymentStatus;
 import com.billing.model.BillingMaster;
 
 public interface BillingMasterRepository extends JpaRepository<BillingMaster, Long> {
@@ -36,6 +37,14 @@ public interface BillingMasterRepository extends JpaRepository<BillingMaster, Lo
 		        @Param("startDate") LocalDateTime startDate,
 		        @Param("endDate") LocalDateTime endDate
 		);
+		
+		Optional<BillingMaster> findActiveByLabOrderId(Long labOrderId);
+		
+		Optional<BillingMaster> findByLabOrderIdAndPaymentStatus(
+		        Long labOrderId,
+		        PaymentStatus paymentStatus
+		);
+
 
 	
 }
