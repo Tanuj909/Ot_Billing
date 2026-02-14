@@ -44,7 +44,7 @@ public interface BillingMasterRepository extends JpaRepository<BillingMaster, Lo
 		        Long labOrderId,
 		        PaymentStatus paymentStatus
 		);
+		
+		Optional<BillingMaster> findByLabOrderId(Long labOrderId);
 
-
-	
 }

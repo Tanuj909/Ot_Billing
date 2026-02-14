@@ -1,24 +1,28 @@
 package com.billing.laboratory.serviceImpl;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.web.client.ResourceAccessException;
 import com.billing.enums.PaymentStatus;
+import com.billing.enums.RefundStatus;
 import com.billing.laboratory.dto.*;
 import com.billing.laboratory.entity.LabBillingDetails;
+import com.billing.laboratory.entity.LabPayment;
+import com.billing.laboratory.entity.LabRefund;
 import com.billing.laboratory.entity.LabTestBilling;
 import com.billing.laboratory.repository.LabBillingDetailsRepository;
+import com.billing.laboratory.repository.LabPaymentRepository;
+import com.billing.laboratory.repository.LabRefundRepository;
 import com.billing.laboratory.repository.LabTestBillingRepository;
 import com.billing.laboratory.service.LabBillingService;
 import com.billing.model.BillingMaster;
 import com.billing.repository.BillingMasterRepository;
 import com.billing.util.AmountUtil;
-
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -29,6 +33,8 @@ public class LabBillingServiceImpl implements LabBillingService {
     private final BillingMasterRepository billingMasterRepo;
     private final LabBillingDetailsRepository labBillingRepo;
     private final LabTestBillingRepository labTestBillingRepo;
+    private final LabRefundRepository labRefundRepo;
+    private final LabPaymentRepository labPaymentRepo;
 
     @Override
     @Transactional
@@ -78,6 +84,7 @@ public class LabBillingServiceImpl implements LabBillingService {
 
             LabTestBilling testBilling = LabTestBilling.builder()
                     .labBillingDetails(labBilling)
+                    .orderItemId(dto.getOrderItemId())
                     .testName(dto.getTestName())
                     .price(price)
                     .gstPercentage(gstPercentage)
@@ -201,7 +208,7 @@ public class LabBillingServiceImpl implements LabBillingService {
     @Override
     @Transactional
     public void makePayment(LabPaymentRequest request) {
-
+    	
         LabBillingDetails billing = labBillingRepo.findById(request.getLabBillingId())
                 .orElseThrow(() -> new RuntimeException("Lab Billing not found"));
 
@@ -237,6 +244,21 @@ public class LabBillingServiceImpl implements LabBillingService {
         billing.setTotalPayment(totalPaid);
         billing.setDue(due);
         billing.setUpdatedAt(LocalDateTime.now());
+        
+//        INSERT INTO lab_payment HERE -> For Payment History
+        LabPayment payment = LabPayment.builder()
+                .labOrderId(billing.getLabOrderId())
+                .billingId(billing.getBillingMaster().getId())
+                .patientExternalId(
+                        billing.getBillingMaster().getPatientExternalId()
+                )
+                .amount(request.getAmountPaid())
+                .paymentMode(request.getPaymentMode())
+                .paidAt(LocalDateTime.now())
+//                .referenceNumber(request.getReferenceNumber())
+                .build();
+
+        labPaymentRepo.save(payment);
 
         if (totalPaid == 0) {
             billing.getBillingMaster().setPaymentStatus(PaymentStatus.PENDING);
@@ -373,6 +395,561 @@ public class LabBillingServiceImpl implements LabBillingService {
     }
     
     
+    
+    @Override
+    public PaymentStatusResponse getPaymentStatus(Long labOrderId) {
+
+        // 1️⃣ Fetch Billing Master
+        BillingMaster billingMaster =
+                billingMasterRepo.findByLabOrderId(labOrderId)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Billing not found for orderId: " + labOrderId
+                                )
+                        );
+
+        // 2️⃣ Fetch Lab Billing Details
+        LabBillingDetails labBilling =
+                labBillingRepo.findByBillingMaster(billingMaster)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Lab billing details not found"
+                                )
+                        );
+
+        // 3️⃣ Calculate Paid Amount
+        double totalPaid =
+                labBilling.getTotalPayment() != null
+                        ? labBilling.getTotalPayment()
+                        : 0.0;
+
+        double due =
+                labBilling.getDue() != null
+                        ? labBilling.getDue()
+                        : billingMaster.getTotalAmount();
+
+        // 4️⃣ Decide Payment Status (safety)
+        PaymentStatus status = billingMaster.getPaymentStatus();
+
+        return PaymentStatusResponse.builder()
+                .billingId(billingMaster.getId())
+                .labOrderId(labOrderId)
+                .paymentStatus(status)
+                .totalAmount(billingMaster.getTotalAmount())
+                .totalPaid(totalPaid)
+                .dueAmount(due)
+                .billingStatus(labBilling.getBillingStatus())
+                .build();
+    }
+    
+    
+    @Override
+    @Transactional
+    public void cancelBilling(Long labOrderId) {
+
+        // 1️⃣ Fetch Billing Master
+        BillingMaster billingMaster =
+                billingMasterRepo.findByLabOrderId(labOrderId)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Billing not found for orderId: " + labOrderId
+                                )
+                        );
+
+        // 2️⃣ Block cancellation if PAID
+        if (billingMaster.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new IllegalStateException(
+                    "Paid billing cannot be cancelled"
+            );
+        }
+
+        // 3️⃣ Fetch Lab Billing Details
+        LabBillingDetails labBilling =
+                labBillingRepo.findByBillingMaster(billingMaster)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Lab billing details not found"
+                                )
+                        );
+
+        // 4️⃣ Cancel Billing (NO DELETE)
+        billingMaster.setPaymentStatus(PaymentStatus.CANCELLED);
+        billingMaster.setUpdatedAt(LocalDateTime.now());
+
+        labBilling.setBillingStatus("CANCELLED");
+        labBilling.setDue(0.0);
+        labBilling.setUpdatedAt(LocalDateTime.now());
+
+        // ❌ Do NOT delete LabTestBilling rows
+        // ❌ Do NOT delete BillingMaster
+    }
+
+    
+    @Override
+    @Transactional
+    public LabRefundResponse refund(LabRefundRequest request) {
+
+        // 1️⃣ Fetch BillingMaster
+        BillingMaster billingMaster =
+                billingMasterRepo.findByLabOrderId(request.getLabOrderId())
+                        .orElseThrow(() ->
+                                new IllegalStateException("Billing not found")
+                        );
+
+        // 2️⃣ Refund only if PAID / PARTIALLY_PAID
+        if (billingMaster.getPaymentStatus() == PaymentStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Refund not allowed for unpaid bill"
+            );
+        }
+
+        LabBillingDetails labBilling =
+                labBillingRepo.findByBillingMaster(billingMaster)
+                        .orElseThrow(() ->
+                                new IllegalStateException("Lab billing not found")
+                        );
+
+        double paidAmount =
+                labBilling.getTotalPayment() != null
+                        ? labBilling.getTotalPayment()
+                        : 0.0;
+
+        if (request.getRefundAmount() > paidAmount) {
+            throw new IllegalArgumentException(
+                    "Refund amount cannot exceed paid amount"
+            );
+        }
+
+        // 3️⃣ Create refund entry
+        LabRefund refund = LabRefund.builder()
+                .labOrderId(request.getLabOrderId())
+                .billingId(billingMaster.getId())
+                .labStoreId(billingMaster.getLabStoreId())
+                .refundAmount(request.getRefundAmount())
+                .reason(request.getReason())
+                .refundStatus(RefundStatus.INITIATED)
+                .build();
+
+        labRefundRepo.save(refund);
+
+        // 4️⃣ Update billing amounts
+        double newPaid = paidAmount - request.getRefundAmount();
+        labBilling.setTotalPayment(newPaid);
+        labBilling.setDue(billingMaster.getTotalAmount() - newPaid);
+
+        // 5️⃣ Update payment status
+        if (newPaid == 0) {
+            billingMaster.setPaymentStatus(PaymentStatus.PENDING);
+        } else {
+            billingMaster.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+        }
+
+        // 6️⃣ Mark refund completed (simplified)
+        refund.setRefundStatus(RefundStatus.COMPLETED);
+        refund.setRefundedAt(LocalDateTime.now());
+
+        return LabRefundResponse.builder()
+                .refundId(refund.getId())
+                .labOrderId(refund.getLabOrderId())
+                .refundAmount(refund.getRefundAmount())
+                .refundStatus(refund.getRefundStatus().name())
+                .build();
+    }
+    
+    @Override
+    public RefundStatusResponse getRefundStatus(Long orderId) {
+
+        // 1️⃣ Fetch refund record
+        LabRefund refund =
+                labRefundRepo.findByLabOrderId(orderId)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Refund not found Order ID: " + orderId
+                                )
+                        );
+
+        // 2️⃣ Map response
+        return RefundStatusResponse.builder()
+                .refundId(refund.getId())
+                .labOrderId(refund.getLabOrderId())
+                .billingId(refund.getBillingId())
+                .refundAmount(refund.getRefundAmount())
+                .refundStatus(refund.getRefundStatus().name())
+                .reason(refund.getReason())
+                .createdAt(refund.getCreatedAt())
+                .refundedAt(refund.getRefundedAt())
+                .build();
+    }
+    
+    
+    @Override
+    public RefundReportResponse getRefundReport(Long storeId) {
+    	
+    	List<LabRefund> refunds = labRefundRepo.getRefundReportByLabStoreId(storeId)
+    			.orElseThrow(()-> new ResourceAccessException("Refund for this Store Not Available!"));
+    	
+    	double totalAmount = 
+    			refunds.stream()
+    			.mapToDouble(LabRefund::getRefundAmount)
+    			.sum();
+    	
+    	List<RefundReportItemDTO> items =
+    			refunds.stream()
+    			.map(refund -> RefundReportItemDTO.builder()
+    					.refundId(refund.getId())
+    					.labOrderId(refund.getLabOrderId())
+    					.refundAmount(refund.getRefundAmount())
+    					.billingId(refund.getBillingId())
+    					.reason(refund.getReason())
+    					.refundStatus(refund.getRefundStatus().name())
+    					.refundedAt(refund.getRefundedAt())
+    					.build()
+    				)
+    			.toList();
+    	
+    	RefundReportResponse response = RefundReportResponse.builder()
+    			.totalRefundAmount(totalAmount)
+    			.totalRefundCount(items.size())
+    			.refunds(items)
+    			.build();
+    			
+    	return response;
+    }
+    
+//    @Override
+//    public String processLabTestRefund(Long labOrderId,
+//                                       Long orderItemId,
+//                                       String reason) {
+//
+//        // 1️⃣ Fetch Billing Master
+//        BillingMaster billingMaster = billingMasterRepo
+//                .findByLabOrderId(labOrderId)
+//                .orElseThrow(() -> new ResourceAccessException("BillingMaster not found"));
+//
+//        // 2️⃣ Fetch Billing Details
+//        LabBillingDetails billingDetails = labBillingRepo
+//                .findByLabOrderIdAndBillingMaster_Id(
+//                        labOrderId,
+//                        billingMaster.getId())
+//                .orElseThrow(() -> new ResourceAccessException("Billing details not found"));
+//
+//        // 3️⃣ Fetch Test Billing
+//        LabTestBilling testBilling = labTestBillingRepo
+//                .findByLabBillingDetails_IdAndOrderItemId(
+//                        billingDetails.getId(),
+//                        orderItemId)
+//                .orElseThrow(() -> new ResourceAccessException("Test billing not found"));
+//
+//        // 4️⃣ Prevent Double Refund
+//        boolean alreadyRefunded = labRefundRepo
+//                .existsByBillingIdAndOrderItemIdAndRefundStatus(
+//                        billingMaster.getId(),
+//                        orderItemId,
+//                        RefundStatus.PROCESSED);
+//
+//        if (alreadyRefunded) {
+//            throw new IllegalStateException("This test is already refunded");
+//        }
+//
+//        // 5️⃣ Financial Calculation (Discount Safe)
+//
+//        BigDecimal orderTotal =
+//                BigDecimal.valueOf(billingDetails.getTestCharges());
+//
+//        BigDecimal totalDiscount =
+//                billingDetails.getDiscountAmount() == null
+//                        ? BigDecimal.ZERO
+//                        : BigDecimal.valueOf(billingDetails.getDiscountAmount());
+//
+//        BigDecimal testGross =
+//                BigDecimal.valueOf(testBilling.getTotalAmount());
+//
+//        BigDecimal refundAmount;
+//
+//        if (totalDiscount.compareTo(BigDecimal.ZERO) > 0) {
+//
+//            BigDecimal discountRatio = totalDiscount
+//                    .divide(orderTotal, 6, BigDecimal.ROUND_HALF_UP);
+//
+//            BigDecimal discountShare = testGross
+//                    .multiply(discountRatio);
+//
+//            refundAmount = testGross
+//                    .subtract(discountShare)
+//                    .setScale(2, BigDecimal.ROUND_HALF_UP);
+//
+//        } else {
+//            refundAmount = testGross.setScale(2, BigDecimal.ROUND_HALF_UP);
+//        }
+//
+//        // 6️⃣ Validate Refund Not Exceeding Paid
+//        BigDecimal totalPaid =
+//                BigDecimal.valueOf(billingDetails.getTotalPayment());
+//
+//        if (refundAmount.compareTo(totalPaid) > 0) {
+//            throw new IllegalStateException("Refund exceeds paid amount");
+//        }
+//
+//        // 7️⃣ Save Refund Entry
+//        LabRefund refund = LabRefund.builder()
+//                .labOrderId(labOrderId)
+//                .billingId(billingMaster.getId())
+//                .labStoreId(billingMaster.getLabStoreId())
+//                .orderItemId(orderItemId)
+//                .refundAmount(refundAmount.doubleValue())
+//                .reason(reason)
+//                .refundStatus(RefundStatus.PROCESSED)
+//                .refundedAt(LocalDateTime.now())
+//                .createdAt(LocalDateTime.now())
+//                .build();
+//
+//        labRefundRepo.save(refund);
+//
+//        // 8️⃣ Update Billing Details
+//
+//        BigDecimal updatedPayment = totalPaid.subtract(refundAmount);
+//        billingDetails.setTotalPayment(updatedPayment.doubleValue());
+//
+//        BigDecimal updatedDue = orderTotal.subtract(updatedPayment);
+//        billingDetails.setDue(updatedDue.doubleValue());
+//
+//        billingDetails.setUpdatedAt(LocalDateTime.now());
+//        labBillingRepo.save(billingDetails);
+//
+//        // 9️⃣ Derive Payment Status
+//
+//        BigDecimal totalRefunded =
+//                BigDecimal.valueOf(
+//                        labRefundRepo
+//                                .sumProcessedRefundByBillingId(
+//                                        billingMaster.getId()
+//                                )
+//                );
+//
+//        BigDecimal invoiceTotal =
+//                BigDecimal.valueOf(billingMaster.getTotalAmount());
+//
+//        if (totalRefunded.compareTo(invoiceTotal) == 0) {
+//            billingMaster.setPaymentStatus(PaymentStatus.REFUNDED);
+//        }
+//        else if (totalRefunded.compareTo(BigDecimal.ZERO) > 0) {
+//            billingMaster.setPaymentStatus(PaymentStatus.PARTIALLY_REFUNDED);
+//        }
+//        else if (updatedDue.compareTo(BigDecimal.ZERO) > 0) {
+//            billingMaster.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+//        }
+//        else {
+//            billingMaster.setPaymentStatus(PaymentStatus.PAID);
+//        }
+//
+//        billingMaster.setUpdatedAt(LocalDateTime.now());
+//        billingMasterRepo.save(billingMaster);
+//
+//        return "Refund processed successfully";
+//    }
+
+    @Override
+    @Transactional
+    public String processLabTestRefund(Long labOrderId,
+                                       Long orderItemId,
+                                       String reason) {
+
+        if (labOrderId == null || orderItemId == null) {
+            throw new IllegalArgumentException("Invalid refund request");
+        }
+
+        // 1️⃣ Fetch Billing Master
+        BillingMaster billingMaster = billingMasterRepo
+                .findByLabOrderId(labOrderId)
+                .orElseThrow(() -> new RuntimeException("Billing not found"));
+
+        // 2️⃣ Fetch Billing Details
+        LabBillingDetails billingDetails = labBillingRepo
+                .findByLabOrderIdAndBillingMaster_Id(
+                        labOrderId,
+                        billingMaster.getId())
+                .orElseThrow(() -> new RuntimeException("Billing details not found"));
+
+        // 3️⃣ Fetch Test Billing
+        LabTestBilling testBilling = labTestBillingRepo
+                .findByLabBillingDetails_IdAndOrderItemId(
+                        billingDetails.getId(),
+                        orderItemId)
+                .orElseThrow(() -> new RuntimeException("Test billing not found"));
+
+        // 4️⃣ Prevent Double Refund
+        boolean alreadyRefunded = labRefundRepo
+                .existsByBillingIdAndOrderItemIdAndRefundStatus(
+                        billingMaster.getId(),
+                        orderItemId,
+                        RefundStatus.PROCESSED);
+
+        if (alreadyRefunded) {
+            throw new IllegalStateException("Test already refunded");
+        }
+
+        // =========================
+        // 5️⃣ Financial Calculation
+        // =========================
+
+        BigDecimal testGross = testBilling.getTotalAmount() == null
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(testBilling.getTotalAmount());
+
+        if (testGross.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Invalid test amount");
+        }
+
+        // 🔹 If discount applied at order level
+        BigDecimal orderTotal = billingDetails.getTestCharges() == null
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(billingDetails.getTestCharges());
+
+        BigDecimal totalDiscount = billingDetails.getDiscountAmount() == null
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(billingDetails.getDiscountAmount());
+
+        BigDecimal refundAmount;
+
+        if (totalDiscount.compareTo(BigDecimal.ZERO) > 0 && orderTotal.compareTo(BigDecimal.ZERO) > 0) {
+
+            BigDecimal discountRatio = totalDiscount
+                    .divide(orderTotal, 6, RoundingMode.HALF_UP);
+
+            BigDecimal discountShare = testGross.multiply(discountRatio);
+
+            refundAmount = testGross
+                    .subtract(discountShare)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+        } else {
+            refundAmount = testGross.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // =========================
+        // 6️⃣ Validate Payment Exists
+        // =========================
+
+        BigDecimal totalPaid = billingDetails.getTotalPayment() == null
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(billingDetails.getTotalPayment());
+
+        if (refundAmount.compareTo(totalPaid) > 0) {
+            throw new IllegalStateException("Refund exceeds paid amount");
+        }
+
+        // =========================
+        // 7️⃣ Save Refund Entry
+        // =========================
+
+        LabRefund refund = LabRefund.builder()
+                .labOrderId(labOrderId)
+                .billingId(billingMaster.getId())
+                .labStoreId(billingMaster.getLabStoreId())
+                .orderItemId(orderItemId)
+                .refundAmount(refundAmount.doubleValue())
+                .reason(reason)
+                .refundStatus(RefundStatus.PROCESSED)
+                .refundedAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        labRefundRepo.save(refund);
+
+        // =========================
+        // 8️⃣ Update Billing Details
+        // =========================
+
+        BigDecimal updatedPayment = totalPaid.subtract(refundAmount);
+        billingDetails.setTotalPayment(updatedPayment.doubleValue());
+
+        BigDecimal updatedDue = orderTotal.subtract(updatedPayment);
+        billingDetails.setDue(updatedDue.doubleValue());
+
+        billingDetails.setUpdatedAt(LocalDateTime.now());
+        labBillingRepo.save(billingDetails);
+
+        // =========================
+        // 9️⃣ Update Payment Status
+        // =========================
+
+        Double refundedSum =
+                labRefundRepo.sumProcessedRefundByBillingId(billingMaster.getId());
+
+        BigDecimal totalRefunded = refundedSum == null
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(refundedSum);
+
+        BigDecimal invoiceTotal = BigDecimal.valueOf(billingMaster.getTotalAmount());
+
+        if (totalRefunded.compareTo(invoiceTotal) == 0) {
+            billingMaster.setPaymentStatus(PaymentStatus.REFUNDED);
+        }
+        else if (totalRefunded.compareTo(BigDecimal.ZERO) > 0) {
+            billingMaster.setPaymentStatus(PaymentStatus.PARTIALLY_REFUNDED);
+        }
+        else if (updatedDue.compareTo(BigDecimal.ZERO) > 0) {
+            billingMaster.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
+        }
+        else {
+            billingMaster.setPaymentStatus(PaymentStatus.PAID);
+        }
+
+        billingMaster.setUpdatedAt(LocalDateTime.now());
+        billingMasterRepo.save(billingMaster);
+
+        return "Refund processed successfully";
+    }
+
+
+    @Override
+    public List<PaymentHistoryResponse> getPaymentHistory(Long orderId){
+    	List<LabPayment> payments = labPaymentRepo.findByLabOrderIdOrderByPaidAtDesc(orderId);
+    	
+    	if(payments.isEmpty()) {
+    		return List.of();
+    	}
+    	
+       List<PaymentHistoryResponse> response = 
+    			payments.stream()
+    			.map(payment -> PaymentHistoryResponse.builder()
+    					.paymentId(payment.getId())
+    					.amount(payment.getAmount())
+    					.paymentMode(payment.getPaymentMode().name())
+    					.referenceNumber(payment.getReferenceNumber())
+    					.paidAt(payment.getPaidAt())
+    					.build()
+    				)
+    			.toList();
+       
+       return response;
+    }
+    
+    @Override
+    public List<PatientPaymentHistoryResponse> getPaymentHistoryByPatient(Long patientId){
+    	
+    	List<LabPayment> payments = labPaymentRepo.findByPatientExternalIdOrderByPaidAtDesc(patientId);
+    	
+    	if(payments.isEmpty()) {
+    		return List.of();
+    	}
+    	
+    	List<PatientPaymentHistoryResponse> response = payments.stream()
+    			.map(payment -> PatientPaymentHistoryResponse.builder()
+    					.paymentId(payment.getId())
+    					.labOrderId(payment.getLabOrderId())
+    					.billingId(payment.getBillingId())
+    					.amount(payment.getAmount())
+    					.paymentMode(payment.getPaymentMode().name())
+    					.paidAt(payment.getPaidAt())
+    					.build()
+    				)
+    			.toList();
+    	return response;
+    }
+
+
+
     @Override
     public BillingRevenueResponseDTO getRevenueSummary(
             RevenueSummaryRequest request
@@ -431,8 +1008,5 @@ public class LabBillingServiceImpl implements LabBillingService {
     private double round(double v) {
         return Math.round(v * 100.0) / 100.0;
     }
-
-
-
 
 }

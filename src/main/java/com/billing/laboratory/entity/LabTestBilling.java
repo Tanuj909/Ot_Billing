@@ -3,6 +3,8 @@ package com.billing.laboratory.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -34,6 +36,9 @@ public class LabTestBilling {
     @JoinColumn(name = "lab_billing_id", nullable = false)
     @JsonIgnore
     private LabBillingDetails labBillingDetails;
+    
+    @Column(name = "order_item_id")
+    private Long orderItemId;
 	
     private String testName;
     private Double price;

@@ -13,7 +13,7 @@ public interface LabBillingDetailsRepository extends JpaRepository<LabBillingDet
 	
 	Optional<LabBillingDetails> findByBillingMaster(BillingMaster billingMaster);
 
-	
-	
+	Optional<LabBillingDetails> 
+	findByLabOrderIdAndBillingMaster_Id(Long labOrderId, Long billingId);
 
 }

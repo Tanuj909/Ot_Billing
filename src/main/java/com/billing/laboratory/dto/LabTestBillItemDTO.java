@@ -10,6 +10,7 @@ import lombok.Data;
 public class LabTestBillItemDTO {
 
 	private Long id;
+	private Long orderItemId;
     private String testName;
     private Double price;
     private Double totalAmount;
