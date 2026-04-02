@@ -46,5 +46,18 @@ public interface BillingMasterRepository extends JpaRepository<BillingMaster, Lo
 		);
 		
 		Optional<BillingMaster> findByLabOrderId(Long labOrderId);
+		
+		Optional<BillingMaster> findByOtOperationId(Long otOperationId);
+		boolean existsByOtOperationId(Long otOperationId);
+
+		Optional<BillingMaster> findByPatientExternalId(Long patientId);
+
+		Optional<BillingMaster> findByModuleType(String moduleType);
+		
+	    boolean existsByPatientExternalIdAndModuleTypeAndHospitaExternallIdAndPaymentStatusNotIn(
+	            Long patientExternalId,
+	            String moduleType,
+	            Long hospitalExternalId,
+	            List<PaymentStatus> terminalStatuses);
 
 }
