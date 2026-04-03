@@ -70,6 +70,12 @@ public class OTBillingDetails {
 
     @OneToMany(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<OTItemBilling> itemCharges = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<OTPayment> payments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<OTRefund> refunds = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

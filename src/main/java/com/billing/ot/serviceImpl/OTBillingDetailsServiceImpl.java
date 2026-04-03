@@ -36,9 +36,18 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                 .orElseThrow(() -> new ResourceNotFoundException("Billing master not found"));
         
         // Duplicate check
-        if (otBillingDetailsRepository.existsByOperationExternalId(billingMaster.getOtOperationId())) {
-            throw new ValidationException("OT Billing already exists for operation: "
-                    + billingMaster.getOtOperationId());
+//        if (otBillingDetailsRepository.existsByOperationExternalId(billingMaster.getOtOperationId())) {
+//            throw new ValidationException("OT Billing already exists for operation: "
+//                    + billingMaster.getOtOperationId());
+//        }
+        
+     // ✅ Check if already exists (idempotent behavior)
+        OTBillingDetails existing = otBillingDetailsRepository
+                .findByOperationExternalId(billingMaster.getOtOperationId())
+                .orElse(null);
+
+        if (existing != null) {
+            return mapToResponse(existing); // 🔥 IMPORTANT
         }
         
         // 👇 BillingMaster status check — CANCELLED billing pe details nahi ban sakti
@@ -173,13 +182,17 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
         if (details.getBillingStatus().equals("CANCELLED")) {
             throw new ValidationException("Cancelled billing cannot be closed");
         }
+        
+//        if (details.getTotalAmount() == null || details.getTotalAmount() <= 0) {
+//            throw new ValidationException("Cannot close billing — total amount is zero");
+//        }
 
         details.setBillingStatus("CLOSED");
 
         // BillingMaster status update
-        BillingMaster billingMaster = details.getBillingMaster();
-        billingMaster.setPaymentStatus(PaymentStatus.COMPLETED);
-        billingMasterRepository.save(billingMaster);
+//        BillingMaster billingMaster = details.getBillingMaster();
+//        billingMaster.setPaymentStatus(PaymentStatus.COMPLETED);
+//        billingMasterRepository.save(billingMaster);
 
         otBillingDetailsRepository.save(details);
         return mapToResponse(details);
