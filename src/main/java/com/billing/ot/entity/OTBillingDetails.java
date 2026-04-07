@@ -68,8 +68,13 @@ public class OTBillingDetails {
     @OneToOne(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private OTRoomBilling roomCharges;
 
-    @OneToMany(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<OTItemBilling> itemCharges = new ArrayList<>();
+    @OneToMany(
+    	    mappedBy = "otBillingDetails",
+    	    cascade = CascadeType.ALL,
+    	    fetch = FetchType.LAZY,
+    	    orphanRemoval = true // 🔥 ADD THIS
+    	)
+    	private List<OTItemBilling> itemCharges = new ArrayList<>();
     
     @OneToMany(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<OTPayment> payments = new ArrayList<>();

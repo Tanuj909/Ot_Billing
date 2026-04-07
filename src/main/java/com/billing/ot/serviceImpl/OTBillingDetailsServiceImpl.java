@@ -1,5 +1,9 @@
 package com.billing.ot.serviceImpl;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
 
 import com.billing.enums.PaymentStatus;
@@ -9,8 +13,18 @@ import com.billing.exception.ValidationException;
 import com.billing.model.BillingMaster;
 import com.billing.ot.dto.OTBillingDetailsRequest;
 import com.billing.ot.dto.OTBillingDetailsResponse;
+import com.billing.ot.dto.OTBillingSummaryResponse;
+import com.billing.ot.dto.OTItemBillingResponse;
+import com.billing.ot.dto.OTRoomBillingResponse;
+import com.billing.ot.dto.OTStaffBillingResponse;
 import com.billing.ot.entity.OTBillingDetails;
+import com.billing.ot.mapper.OTBillingMapper;
 import com.billing.ot.repository.OTBillingDetailsRepository;
+import com.billing.ot.repository.OTItemBillingRepository;
+import com.billing.ot.repository.OTPaymentRepository;
+import com.billing.ot.repository.OTRefundRepository;
+import com.billing.ot.repository.OTRoomBillingRepository;
+import com.billing.ot.repository.OTStaffBillingRepository;
 import com.billing.ot.service.OTBillingDetailsService;
 import com.billing.repository.BillingMasterRepository;
 
@@ -23,6 +37,13 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
 
     private final OTBillingDetailsRepository otBillingDetailsRepository;
     private final BillingMasterRepository billingMasterRepository;
+    private final OTPaymentRepository paymentRepository;
+    private final OTRefundRepository refundRepository;
+    private final OTStaffBillingRepository staffBillingRepository;
+    private final OTRoomBillingRepository roomBillingRepository;
+    private final OTItemBillingRepository itemBillingRepository;
+    private final OTBillingMapper otBillingMapper;  // 👈 inject
+    
 
     // ---------------------------------------- Create ---------------------------------------- //
 
@@ -218,6 +239,142 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                 .advancePaid(details.getAdvancePaid())
                 .due(details.getDue())
                 .billingStatus(details.getBillingStatus())
+                .createdAt(details.getCreatedAt())
+                .updatedAt(details.getUpdatedAt())
+                .build();
+    }
+    
+    
+    
+    @Override
+    public OTBillingSummaryResponse getBillingSummary(Long operationId) {
+
+        // 1. OTBillingDetails fetch
+        OTBillingDetails details = otBillingDetailsRepository
+                .findByOperationExternalId(operationId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "OT Billing not found for operation: " + operationId));
+
+        BillingMaster billingMaster = details.getBillingMaster();
+
+        // 2. Staff charges
+        List<OTStaffBillingResponse> staffList = staffBillingRepository
+                .findByOtBillingDetails(details)
+                .stream()
+                .map(otBillingMapper::mapStaff)
+                .collect(Collectors.toList());
+
+        double totalStaff = staffList.stream()
+                .mapToDouble(s -> s.getTotalAmount() != null ? s.getTotalAmount() : 0.0)
+                .sum();
+
+        // 3. Room charges
+        List<OTRoomBillingResponse> roomList = roomBillingRepository
+                .findAllByOtBillingDetails(details)
+                .stream()
+                .map(otBillingMapper::mapRoom)
+                .collect(Collectors.toList());
+
+        double totalRoom = roomList.stream()
+                .mapToDouble(r -> r.getTotalAmount() != null ? r.getTotalAmount() : 0.0)
+                .sum();
+
+        // 4. Item charges
+        List<OTItemBillingResponse> itemList = itemBillingRepository
+                .findByOtBillingDetails(details)
+                .stream()
+                .map(otBillingMapper::mapItem)
+                .collect(Collectors.toList());
+
+        double totalItems = itemList.stream()
+                .mapToDouble(i -> i.getTotalAmount() != null ? i.getTotalAmount() : 0.0)
+                .sum();
+
+        // Group by itemType
+        Map<String, Double> totalByType = itemList.stream()
+                .collect(Collectors.groupingBy(
+                        i -> i.getItemType().name(),
+                        Collectors.summingDouble(i -> i.getTotalAmount() != null
+                                ? i.getTotalAmount() : 0.0)));
+
+        // 5. Payments
+        List<OTBillingSummaryResponse.PaymentEntry> payments = paymentRepository
+                .findByOtBillingDetails(details)
+                .stream()
+                .map(p -> OTBillingSummaryResponse.PaymentEntry.builder()
+                        .id(p.getId())
+                        .paymentType(p.getPaymentType().name())
+                        .paymentMode(p.getPaymentMode().name())
+                        .amount(p.getAmount())
+                        .status(p.getStatus().name())
+                        .referenceNumber(p.getReferenceNumber())
+                        .receivedBy(p.getReceivedBy())
+                        .notes(p.getNotes())
+                        .paidAt(p.getPaidAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        // 6. Refunds
+        List<OTBillingSummaryResponse.RefundEntry> refunds = refundRepository
+                .findByOtBillingDetails(details)
+                .stream()
+                .map(r -> OTBillingSummaryResponse.RefundEntry.builder()
+                        .id(r.getId())
+                        .paymentId(r.getOtPayment().getId())
+                        .refundAmount(r.getRefundAmount())
+                        .reason(r.getReason())
+                        .refundMode(r.getRefundMode().name())
+                        .refundStatus(r.getRefundStatus().name())
+                        .processedBy(r.getProcessedBy())
+                        .refundedAt(r.getRefundedAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        // 7. Total paid — sirf SUCCESS payments
+        double totalPaid = payments.stream()
+                .filter(p -> p.getStatus().equals("SUCCESS"))
+                .mapToDouble(OTBillingSummaryResponse.PaymentEntry::getAmount)
+                .sum();
+
+        // 8. Total refunded — sirf COMPLETED refunds
+        double totalRefunded = refunds.stream()
+                .filter(r -> r.getRefundStatus().equals("COMPLETED"))
+                .mapToDouble(OTBillingSummaryResponse.RefundEntry::getRefundAmount)
+                .sum();
+
+        return OTBillingSummaryResponse.builder()
+                .operationExternalId(operationId)
+                .operationReference(details.getOperationReference())
+                .patientExternalId(details.getPatientExternalId())
+                .hospitalExternalId(details.getHospitalExternalId())
+                .billingMasterId(billingMaster.getId())
+                .paymentStatus(billingMaster.getPaymentStatus().name())
+                .paymentMode(billingMaster.getPaymentMode() != null
+                        ? billingMaster.getPaymentMode().name() : null)
+                .billingDate(billingMaster.getBillingDate())
+                .staffCharges(OTBillingSummaryResponse.StaffChargesSummary.builder()
+                        .totalAmount(totalStaff)
+                        .staff(staffList)
+                        .build())
+                .roomCharges(OTBillingSummaryResponse.RoomChargesSummary.builder()
+                        .totalAmount(totalRoom)
+                        .rooms(roomList)
+                        .build())
+                .itemCharges(OTBillingSummaryResponse.ItemChargesSummary.builder()
+                        .totalAmount(totalItems)
+                        .totalByType(totalByType)
+                        .items(itemList)
+                        .build())
+                .grossAmount(details.getGrossAmount())
+                .totalDiscountAmount(details.getTotalDiscountAmount())
+                .totalGstAmount(details.getTotalGstAmount())
+                .totalAmount(details.getTotalAmount())
+                .totalPaid(totalPaid)
+                .totalRefunded(totalRefunded)
+                .due(details.getDue())
+                .billingStatus(details.getBillingStatus())
+                .payments(payments)
+                .refunds(refunds)
                 .createdAt(details.getCreatedAt())
                 .updatedAt(details.getUpdatedAt())
                 .build();

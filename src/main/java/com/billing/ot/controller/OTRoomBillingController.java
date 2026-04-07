@@ -47,7 +47,7 @@ public class OTRoomBillingController {
                 otRoomBillingService.updateRoomBilling(request)));
     }
 
-    @PatchMapping("/end-time")
+    @PostMapping("/end-time")
     public ResponseEntity<ApiResponse<OTRoomBillingResponse>> setEndTime(
             @RequestBody OTRoomBillingEndRequest request) {
 

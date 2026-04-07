@@ -57,12 +57,18 @@ public class OTItemBillingServiceImpl implements OTItemBillingService {
         validateBillingActive(details);
 
         // Duplicate check
-        if (itemBillingRepository.existsByOtBillingDetailsAndItemExternalId(
-                details, request.getItemExternalId())) {
-            throw new ValidationException("Item already added to billing: "
-                    + request.getItemName());
-        }
+//        if (itemBillingRepository.existsByOtBillingDetailsAndItemExternalId(
+//                details, request.getItemExternalId())) {
+//            throw new ValidationException("Item already added to billing: "
+//                    + request.getItemName());
+//        }
 
+
+        Integer quantity = (request.getQuantity() == null || request.getQuantity() <= 0)
+                ? 1
+                : request.getQuantity();
+        
+        
         OTItemBilling item = OTItemBilling.builder()
                 .otBillingDetails(details)
                 .itemExternalId(request.getItemExternalId())
@@ -70,7 +76,7 @@ public class OTItemBillingServiceImpl implements OTItemBillingService {
                 .itemName(request.getItemName())
                 .itemCode(request.getItemCode())
                 .hsnCode(request.getHsnCode())
-                .quantity(request.getQuantity())
+                .quantity(quantity)
                 .unitPrice(request.getUnitPrice())
                 .discountPercent(request.getDiscountPercent())
                 .gstPercent(request.getGstPercent())
@@ -117,11 +123,19 @@ public class OTItemBillingServiceImpl implements OTItemBillingService {
         OTItemBilling item = itemBillingRepository.findById(itemBillingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item billing not found"));
 
-        validateBillingActive(item.getOtBillingDetails());
+        OTBillingDetails billing = item.getOtBillingDetails();
 
-        Long operationId = item.getOtBillingDetails().getOperationExternalId();
+        validateBillingActive(billing);
 
-        itemBillingRepository.delete(item);
+        Long operationId = billing.getOperationExternalId();
+
+        // ✅ Correct deletion
+        billing.getItemCharges().remove(item);
+
+        // optional but safe
+        itemBillingRepository.flush();
+
+        // Recalculate
         otBillingDetailsService.recalculateTotals(operationId);
     }
 

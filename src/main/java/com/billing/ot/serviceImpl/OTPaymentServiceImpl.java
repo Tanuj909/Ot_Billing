@@ -81,7 +81,7 @@ public class OTPaymentServiceImpl implements OTPaymentService {
         // 4. Create Payment
         OTPayment payment = OTPayment.builder()
                 .otBillingDetails(details)
-                .patientExternalId(request.getPatientExternalId())
+                .patientExternalId(billingMaster.getPatientExternalId())
                 .paymentType(OTPaymentType.ADVANCE)
                 .paymentMode(request.getPaymentMode())
                 .amount(request.getAmount())

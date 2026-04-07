@@ -16,4 +16,7 @@ public interface OTRoomBillingRepository extends JpaRepository<OTRoomBilling, Lo
     // endTime null wala — current active room
     Optional<OTRoomBilling> findByOtBillingDetailsAndEndTimeIsNull(
             OTBillingDetails otBillingDetails);
+    
+    
+    Optional<OTRoomBilling> findByOtBillingDetails_Id(Long billingDetailsId);
 }

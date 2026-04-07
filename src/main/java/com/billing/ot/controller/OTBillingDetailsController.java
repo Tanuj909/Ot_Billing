@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.billing.ot.dto.ApiResponse;
 import com.billing.ot.dto.OTBillingDetailsRequest;
 import com.billing.ot.dto.OTBillingDetailsResponse;
+import com.billing.ot.dto.OTBillingSummaryResponse;
 import com.billing.ot.service.OTBillingDetailsService;
 
 import lombok.RequiredArgsConstructor;
@@ -57,11 +58,19 @@ public class OTBillingDetailsController {
                 otBillingDetailsService.recalculateTotals(operationId)));
     }
 
-    @PatchMapping("/operation/{operationId}/close")
+    @PostMapping("/operation/{operationId}/close")
     public ResponseEntity<ApiResponse<OTBillingDetailsResponse>> closeBilling(
             @PathVariable Long operationId) {
 
         return ResponseEntity.ok(ApiResponse.success("Billing closed successfully",
                 otBillingDetailsService.closeBilling(operationId)));
+    }
+    
+    @GetMapping("/operation/{operationId}/summary")
+    public ResponseEntity<ApiResponse<OTBillingSummaryResponse>> getBillingSummary(
+            @PathVariable Long operationId) {
+
+        return ResponseEntity.ok(ApiResponse.success("Billing summary fetched successfully",
+                otBillingDetailsService.getBillingSummary(operationId)));
     }
 }

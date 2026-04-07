@@ -2,6 +2,7 @@ package com.billing.ot.service;
 
 import com.billing.ot.dto.OTBillingDetailsRequest;
 import com.billing.ot.dto.OTBillingDetailsResponse;
+import com.billing.ot.dto.OTBillingSummaryResponse;
 
 public interface OTBillingDetailsService {
 
@@ -14,5 +15,7 @@ public interface OTBillingDetailsService {
 	OTBillingDetailsResponse recalculateTotals(Long operationId);
 
 	OTBillingDetailsResponse closeBilling(Long operationId);
+
+	OTBillingSummaryResponse getBillingSummary(Long operationId);
 
 }

@@ -43,12 +43,12 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
     private OTRoomBilling getActiveRoom(OTBillingDetails details) {
         return roomBillingRepository
                 .findByOtBillingDetailsAndEndTimeIsNull(details)
-                .orElseThrow(() -> new ResourceNotFoundException("No active room found"));
+                .orElseThrow(() -> new ResourceNotFoundException("No Active room found"));
     }
 
     // Helper — Billing checks
     private void validateBillingActive(OTBillingDetails details) {
-        if (!details.getBillingStatus().equals("ACTIVE")) {
+        if (!details.getBillingStatus().equals("Active")) {
             throw new ValidationException("Cannot proceed — billing is "
                     + details.getBillingStatus());
         }
@@ -66,7 +66,7 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
         OTBillingDetails details = getDetails(request.getOperationExternalId());
         validateBillingActive(details);
 
-        // Already active room check — endTime null wala
+        // Already Active room check — endTime null wala
         if (roomBillingRepository.findByOtBillingDetailsAndEndTimeIsNull(details).isPresent()) {
             throw new ValidationException(
                     "Active room already exists — use update or shift API");
@@ -97,41 +97,66 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
         OTBillingDetails details = getDetails(request.getOperationExternalId());
         validateBillingActive(details);
 
-        OTRoomBilling activeRoom = getActiveRoom(details);
+        OTRoomBilling ActiveRoom = getActiveRoom(details);
 
-        if (request.getRoomNumber() != null)      activeRoom.setRoomNumber(request.getRoomNumber());
-        if (request.getRoomName() != null)        activeRoom.setRoomName(request.getRoomName());
-        if (request.getStartTime() != null)       activeRoom.setStartTime(request.getStartTime());
-        if (request.getRatePerHour() != null)     activeRoom.setRatePerHour(request.getRatePerHour());
-        if (request.getDiscountPercent() != null) activeRoom.setDiscountPercent(request.getDiscountPercent());
-        if (request.getGstPercent() != null)      activeRoom.setGstPercent(request.getGstPercent());
+        if (request.getRoomNumber() != null)      ActiveRoom.setRoomNumber(request.getRoomNumber());
+        if (request.getRoomName() != null)        ActiveRoom.setRoomName(request.getRoomName());
+        if (request.getStartTime() != null)       ActiveRoom.setStartTime(request.getStartTime());
+        if (request.getRatePerHour() != null)     ActiveRoom.setRatePerHour(request.getRatePerHour());
+        if (request.getDiscountPercent() != null) ActiveRoom.setDiscountPercent(request.getDiscountPercent());
+        if (request.getGstPercent() != null)      ActiveRoom.setGstPercent(request.getGstPercent());
 
-        activeRoom.calculateAmounts();
-        roomBillingRepository.save(activeRoom);
+        ActiveRoom.calculateAmounts();
+        roomBillingRepository.save(ActiveRoom);
         otBillingDetailsService.recalculateTotals(request.getOperationExternalId());
 
-        return mapToResponse(activeRoom);
+        return mapToResponse(ActiveRoom);
     }
 
     // ---------------------------------------- End Time ---------------------------------------- //
 
+//    @Transactional
+//    @Override
+//    public OTRoomBillingResponse setEndTime(OTRoomBillingEndRequest request) {
+//
+//        OTBillingDetails details = getDetails(request.getOperationExternalId());
+//        OTRoomBilling ActiveRoom = roomBillingRepository.findByOtBillingDetailsAndEndTimeIsNull(details)
+//        		.orElseThrow(()-> new ResourceNotFoundException("Room Not found in Billing!"));
+//
+//        if (request.getEndTime().isBefore(ActiveRoom.getStartTime())) {
+//            throw new ValidationException("End time cannot be before start time");
+//        }
+//
+//        ActiveRoom.setEndTime(request.getEndTime());
+//        ActiveRoom.calculateAmounts();
+//        roomBillingRepository.save(ActiveRoom);
+//        otBillingDetailsService.recalculateTotals(request.getOperationExternalId());
+//
+//        return mapToResponse(ActiveRoom);
+//    }
+    
     @Transactional
     @Override
     public OTRoomBillingResponse setEndTime(OTRoomBillingEndRequest request) {
 
         OTBillingDetails details = getDetails(request.getOperationExternalId());
-        OTRoomBilling activeRoom = getActiveRoom(details);
 
-        if (request.getEndTime().isBefore(activeRoom.getStartTime())) {
+        // 🔥 Simple latest room fetch (NO Active check)
+        OTRoomBilling room = roomBillingRepository
+                .findByOtBillingDetails_Id(details.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Room Not found in Billing!"));
+
+        if (request.getEndTime().isBefore(room.getStartTime())) {
             throw new ValidationException("End time cannot be before start time");
         }
 
-        activeRoom.setEndTime(request.getEndTime());
-        activeRoom.calculateAmounts();
-        roomBillingRepository.save(activeRoom);
+        room.setEndTime(request.getEndTime());
+        room.calculateAmounts();
+        roomBillingRepository.save(room);
+
         otBillingDetailsService.recalculateTotals(request.getOperationExternalId());
 
-        return mapToResponse(activeRoom);
+        return mapToResponse(room);
     }
 
     // ---------------------------------------- Shift ---------------------------------------- //
@@ -143,16 +168,16 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
         OTBillingDetails details = getDetails(request.getOperationExternalId());
         validateBillingActive(details);
 
-        OTRoomBilling activeRoom = getActiveRoom(details);
+        OTRoomBilling ActiveRoom = getActiveRoom(details);
 
-        if (request.getShiftTime().isBefore(activeRoom.getStartTime())) {
+        if (request.getShiftTime().isBefore(ActiveRoom.getStartTime())) {
             throw new ValidationException("Shift time cannot be before current room start time");
         }
 
         // Purana room close karo
-        activeRoom.setEndTime(request.getShiftTime());
-        activeRoom.calculateAmounts();
-        roomBillingRepository.save(activeRoom);
+        ActiveRoom.setEndTime(request.getShiftTime());
+        ActiveRoom.calculateAmounts();
+        roomBillingRepository.save(ActiveRoom);
 
         // Naya room create karo
         OTRoomBilling newRoom = OTRoomBilling.builder()
