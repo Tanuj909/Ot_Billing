@@ -48,7 +48,7 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
 
     // Helper — Billing checks
     private void validateBillingActive(OTBillingDetails details) {
-        if (!details.getBillingStatus().equals("Active")) {
+        if (!details.getBillingStatus().equals("ACTIVE")) {
             throw new ValidationException("Cannot proceed — billing is "
                     + details.getBillingStatus());
         }

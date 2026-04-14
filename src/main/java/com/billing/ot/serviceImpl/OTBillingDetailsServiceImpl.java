@@ -87,6 +87,7 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                 .operationReference(request.getOperationReference())
                 .hospitalExternalId(billingMaster.getHospitaExternallId())
                 .patientExternalId(billingMaster.getPatientExternalId())
+                .billingStatus("ACTIVE")
                 .build();
 
         otBillingDetailsRepository.save(details);
