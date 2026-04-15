@@ -3,9 +3,11 @@ package com.billing.ot.mapper;
 import org.springframework.stereotype.Component;
 
 import com.billing.ot.dto.OTItemBillingResponse;
+import com.billing.ot.dto.OTRecoveryRoomBillingResponse;
 import com.billing.ot.dto.OTRoomBillingResponse;
 import com.billing.ot.dto.OTStaffBillingResponse;
 import com.billing.ot.entity.OTItemBilling;
+import com.billing.ot.entity.OTRecoveryRoomBilling;
 import com.billing.ot.entity.OTRoomBilling;
 import com.billing.ot.entity.OTStaffBilling;
 
@@ -59,6 +61,36 @@ public class OTBillingMapper {
              .createdAt(room.getCreatedAt())
              .build();
  }
+ 
+//==================== Recovery Room Mapper ==================== //
+
+public OTRecoveryRoomBillingResponse mapRecovery(OTRecoveryRoomBilling recovery) {
+  if (recovery == null) return null;
+
+  return OTRecoveryRoomBillingResponse.builder()
+          .id(recovery.getId())
+          .otBillingDetailsId(recovery.getOtBillingDetails().getId())
+          .operationExternalId(recovery.getOtBillingDetails().getOperationExternalId())
+          .wardRoomId(recovery.getWardRoomId())
+          .wardRoomBedId(recovery.getWardRoomBedId())
+          .wardRoomName(recovery.getWardRoomName())
+          .startTime(recovery.getStartTime())
+          .endTime(recovery.getEndTime())
+          .durationMinutes(recovery.getDurationMinutes())
+          .totalHours(recovery.getTotalHours())
+          .ratePerHour(recovery.getRatePerHour())
+          .baseAmount(recovery.getBaseAmount())
+          .discountPercent(recovery.getDiscountPercent())
+          .discountAmount(recovery.getDiscountAmount())
+          .priceAfterDiscount(recovery.getPriceAfterDiscount())
+          .gstPercent(recovery.getGstPercent())
+          .gstAmount(recovery.getGstAmount())
+          .totalAmount(recovery.getTotalAmount())
+          .isCurrent(recovery.getEndTime() == null)
+          .createdAt(recovery.getCreatedAt())
+          .updatedAt(recovery.getUpdatedAt())
+          .build();
+}
 
  // ==================== Item Mapper ==================== //
 

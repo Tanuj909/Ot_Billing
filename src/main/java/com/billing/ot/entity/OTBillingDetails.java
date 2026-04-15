@@ -67,6 +67,17 @@ public class OTBillingDetails {
 
     @OneToOne(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private OTRoomBilling roomCharges;
+    
+    // Recovery Room (Post-OT)
+    @OneToOne(mappedBy = "otBillingDetails", 
+              cascade = CascadeType.ALL, 
+              fetch = FetchType.LAZY,
+              orphanRemoval = true)
+    private OTRecoveryRoomBilling recoveryRoomCharges;
+    
+ // Total field (already aapne mention kiya tha)
+    private Double totalRecoveryCharges = 0.0;
+    
 
     @OneToMany(
     	    mappedBy = "otBillingDetails",
@@ -90,6 +101,7 @@ public class OTBillingDetails {
         advancePaid = 0.0;
         totalStaffCharges = 0.0;
         totalRoomCharges = 0.0;
+        totalRecoveryCharges = 0.0;        // ← ADD THIS
         totalItemCharges = 0.0;
         totalDiscountAmount = 0.0;
         totalGstAmount = 0.0;

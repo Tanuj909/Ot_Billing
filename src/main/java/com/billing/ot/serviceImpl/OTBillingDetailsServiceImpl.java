@@ -15,6 +15,7 @@ import com.billing.ot.dto.OTBillingDetailsRequest;
 import com.billing.ot.dto.OTBillingDetailsResponse;
 import com.billing.ot.dto.OTBillingSummaryResponse;
 import com.billing.ot.dto.OTItemBillingResponse;
+import com.billing.ot.dto.OTRecoveryRoomBillingResponse;
 import com.billing.ot.dto.OTRoomBillingResponse;
 import com.billing.ot.dto.OTStaffBillingResponse;
 import com.billing.ot.entity.OTBillingDetails;
@@ -131,10 +132,15 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                 .mapToDouble(s -> s.getTotalAmount() != null ? s.getTotalAmount() : 0.0)
                 .sum();
 
-        // Room total
+        // Room total (OT Surgery Room)
         double totalRoom = details.getRoomCharges() != null
                 && details.getRoomCharges().getTotalAmount() != null
                 ? details.getRoomCharges().getTotalAmount() : 0.0;
+        
+     // === NEW: Recovery Room Total (Post-OT)
+        double totalRecovery = details.getRecoveryRoomCharges() != null 
+                && details.getRecoveryRoomCharges().getTotalAmount() != null 
+                ? details.getRecoveryRoomCharges().getTotalAmount() : 0.0;
 
         // Items total
         double totalItems = details.getItemCharges().stream()
@@ -163,13 +169,14 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                         .mapToDouble(i -> i.getGstAmount() != null ? i.getGstAmount() : 0.0)
                         .sum();
 
-        double grossAmount = totalStaff + totalRoom + totalItems;
+        double grossAmount = totalStaff + totalRoom + totalRecovery + totalItems;
         double totalAmount = grossAmount;
         double due = totalAmount - (details.getAdvancePaid() != null ? details.getAdvancePaid() : 0.0);
 
         // Update
         details.setTotalStaffCharges(totalStaff);
         details.setTotalRoomCharges(totalRoom);
+        details.setTotalRecoveryCharges(totalRecovery);   // ← Yeh line add karo
         details.setTotalItemCharges(totalItems);
         details.setTotalDiscountAmount(totalDiscount);
         details.setTotalGstAmount(totalGst);
@@ -279,6 +286,16 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
         double totalRoom = roomList.stream()
                 .mapToDouble(r -> r.getTotalAmount() != null ? r.getTotalAmount() : 0.0)
                 .sum();
+        
+     // 4. Recovery Room charges (NEW)
+        OTRecoveryRoomBillingResponse recoveryResponse = null;
+        double totalRecovery = 0.0;
+
+        if (details.getRecoveryRoomCharges() != null) {
+        	recoveryResponse = otBillingMapper.mapRecovery(details.getRecoveryRoomCharges());
+            totalRecovery = details.getRecoveryRoomCharges().getTotalAmount() != null 
+                            ? details.getRecoveryRoomCharges().getTotalAmount() : 0.0;
+        }
 
         // 4. Item charges
         List<OTItemBillingResponse> itemList = itemBillingRepository
@@ -360,6 +377,11 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                 .roomCharges(OTBillingSummaryResponse.RoomChargesSummary.builder()
                         .totalAmount(totalRoom)
                         .rooms(roomList)
+                        .build())
+             // ==================== Recovery Room Summary ====================
+                .recoveryRoomCharges(OTBillingSummaryResponse.RecoveryRoomSummary.builder()
+                        .totalAmount(totalRecovery)
+                        .recoveryRoom(recoveryResponse)
                         .build())
                 .itemCharges(OTBillingSummaryResponse.ItemChargesSummary.builder()
                         .totalAmount(totalItems)
