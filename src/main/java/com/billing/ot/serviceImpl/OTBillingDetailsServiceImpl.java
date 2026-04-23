@@ -146,6 +146,12 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
         double totalItems = details.getItemCharges().stream()
                 .mapToDouble(i -> i.getTotalAmount() != null ? i.getTotalAmount() : 0.0)
                 .sum();
+        
+        // ── 5. Doctor visit charges ✅ NEW ─────────────────────────────────────
+        double totalDoctorVisits = details.getDoctorVisits().stream()
+                .mapToDouble(v -> v.getFees() != null ? v.getFees() : 0.0)
+                .sum();
+     
 
         // Discount total
         double totalDiscount = details.getStaffCharges().stream()
@@ -178,6 +184,7 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
         details.setTotalRoomCharges(totalRoom);
         details.setTotalRecoveryCharges(totalRecovery);   // ← Yeh line add karo
         details.setTotalItemCharges(totalItems);
+        details.setTotalDoctorVisitCharges(totalDoctorVisits);  // ✅ NEW
         details.setTotalDiscountAmount(totalDiscount);
         details.setTotalGstAmount(totalGst);
         details.setGrossAmount(grossAmount);

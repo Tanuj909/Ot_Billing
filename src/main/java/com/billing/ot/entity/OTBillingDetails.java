@@ -78,6 +78,9 @@ public class OTBillingDetails {
  // Total field (already aapne mention kiya tha)
     private Double totalRecoveryCharges = 0.0;
     
+//    Total Doctor Visit Fees
+    private Double totalDoctorVisitCharges = 0.0;
+    
 
     @OneToMany(
     	    mappedBy = "otBillingDetails",
@@ -86,6 +89,14 @@ public class OTBillingDetails {
     	    orphanRemoval = true // 🔥 ADD THIS
     	)
     	private List<OTItemBilling> itemCharges = new ArrayList<>();
+    
+    @OneToMany(
+    	    mappedBy = "otBillingDetails",
+    	    cascade = CascadeType.ALL,
+    	    fetch = FetchType.LAZY,
+    	    orphanRemoval = true
+    	)
+    	private List<OTDoctorVisitBilling> doctorVisits = new ArrayList<>();
     
     @OneToMany(mappedBy = "otBillingDetails", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<OTPayment> payments = new ArrayList<>();
@@ -102,6 +113,7 @@ public class OTBillingDetails {
         totalStaffCharges = 0.0;
         totalRoomCharges = 0.0;
         totalRecoveryCharges = 0.0;        // ← ADD THIS
+        totalDoctorVisitCharges = 0.0;
         totalItemCharges = 0.0;
         totalDiscountAmount = 0.0;
         totalGstAmount = 0.0;
