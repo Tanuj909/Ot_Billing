@@ -14,6 +14,7 @@ import com.billing.model.BillingMaster;
 import com.billing.ot.dto.OTBillingDetailsRequest;
 import com.billing.ot.dto.OTBillingDetailsResponse;
 import com.billing.ot.dto.OTBillingSummaryResponse;
+import com.billing.ot.dto.OTDoctorVisitBillingResponse;
 import com.billing.ot.dto.OTItemBillingResponse;
 import com.billing.ot.dto.OTRecoveryRoomBillingResponse;
 import com.billing.ot.dto.OTRoomBillingResponse;
@@ -21,6 +22,7 @@ import com.billing.ot.dto.OTStaffBillingResponse;
 import com.billing.ot.entity.OTBillingDetails;
 import com.billing.ot.mapper.OTBillingMapper;
 import com.billing.ot.repository.OTBillingDetailsRepository;
+import com.billing.ot.repository.OTDoctorVisitBillingRepository;
 import com.billing.ot.repository.OTItemBillingRepository;
 import com.billing.ot.repository.OTPaymentRepository;
 import com.billing.ot.repository.OTRefundRepository;
@@ -43,6 +45,7 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
     private final OTStaffBillingRepository staffBillingRepository;
     private final OTRoomBillingRepository roomBillingRepository;
     private final OTItemBillingRepository itemBillingRepository;
+    private final OTDoctorVisitBillingRepository doctorVisitBillingRepository;
     private final OTBillingMapper otBillingMapper;  // 👈 inject
     
 
@@ -116,86 +119,88 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
     @Transactional
     @Override
     public OTBillingDetailsResponse recalculateTotals(Long operationId) {
-
+ 
         OTBillingDetails details = otBillingDetailsRepository
                 .findByOperationExternalId(operationId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "OT Billing not found for operation: " + operationId));
-        
-//        //Check if Bill is ACTIVE?
-//        if(!details.getBillingStatus().equals("ACTIVE")) {
-//        	throw new StatusException("Billing Details Not Active");
-//        }
-
-        // Staff total
+ 
+        // ── 1. Staff charges ───────────────────────────────────────────────
         double totalStaff = details.getStaffCharges().stream()
                 .mapToDouble(s -> s.getTotalAmount() != null ? s.getTotalAmount() : 0.0)
                 .sum();
-
-        // Room total (OT Surgery Room)
+ 
+        // ── 2. OT Room charges ─────────────────────────────────────────────
         double totalRoom = details.getRoomCharges() != null
                 && details.getRoomCharges().getTotalAmount() != null
                 ? details.getRoomCharges().getTotalAmount() : 0.0;
-        
-     // === NEW: Recovery Room Total (Post-OT)
-        double totalRecovery = details.getRecoveryRoomCharges() != null 
-                && details.getRecoveryRoomCharges().getTotalAmount() != null 
+ 
+        // ── 3. Recovery Room charges ───────────────────────────────────────
+        double totalRecovery = details.getRecoveryRoomCharges() != null
+                && details.getRecoveryRoomCharges().getTotalAmount() != null
                 ? details.getRecoveryRoomCharges().getTotalAmount() : 0.0;
-
-        // Items total
+ 
+        // ── 4. Item charges ────────────────────────────────────────────────
         double totalItems = details.getItemCharges().stream()
                 .mapToDouble(i -> i.getTotalAmount() != null ? i.getTotalAmount() : 0.0)
                 .sum();
-        
-        // ── 5. Doctor visit charges ✅ NEW ─────────────────────────────────────
+ 
+        // ── 5. Doctor visit charges ✅ BUG FIX — ab totalAmount mein add hoga
         double totalDoctorVisits = details.getDoctorVisits().stream()
                 .mapToDouble(v -> v.getFees() != null ? v.getFees() : 0.0)
                 .sum();
-     
-
-        // Discount total
+ 
+        // ── 6. Discount total (staff + room + recovery + items — visits mein nahi)
         double totalDiscount = details.getStaffCharges().stream()
                 .mapToDouble(s -> s.getDiscountAmount() != null ? s.getDiscountAmount() : 0.0)
                 .sum()
                 + (details.getRoomCharges() != null
                         && details.getRoomCharges().getDiscountAmount() != null
                         ? details.getRoomCharges().getDiscountAmount() : 0.0)
+                + (details.getRecoveryRoomCharges() != null
+                        && details.getRecoveryRoomCharges().getDiscountAmount() != null
+                        ? details.getRecoveryRoomCharges().getDiscountAmount() : 0.0)
                 + details.getItemCharges().stream()
                         .mapToDouble(i -> i.getDiscountAmount() != null ? i.getDiscountAmount() : 0.0)
                         .sum();
-
-        // GST total
+ 
+        // ── 7. GST total
         double totalGst = details.getStaffCharges().stream()
                 .mapToDouble(s -> s.getGstAmount() != null ? s.getGstAmount() : 0.0)
                 .sum()
                 + (details.getRoomCharges() != null
                         && details.getRoomCharges().getGstAmount() != null
                         ? details.getRoomCharges().getGstAmount() : 0.0)
+                + (details.getRecoveryRoomCharges() != null
+                        && details.getRecoveryRoomCharges().getGstAmount() != null
+                        ? details.getRecoveryRoomCharges().getGstAmount() : 0.0)
                 + details.getItemCharges().stream()
                         .mapToDouble(i -> i.getGstAmount() != null ? i.getGstAmount() : 0.0)
                         .sum();
-
-        double grossAmount = totalStaff + totalRoom + totalRecovery + totalItems;
-        double totalAmount = grossAmount;
+ 
+        // ── 8. ✅ BUG FIX — grossAmount aur totalAmount mein doctorVisits ADD karo
+        double grossAmount = totalStaff + totalRoom + totalRecovery + totalItems + totalDoctorVisits;
+        double totalAmount = grossAmount; // post discount+GST already included per-item
+ 
         double due = totalAmount - (details.getAdvancePaid() != null ? details.getAdvancePaid() : 0.0);
-
-        // Update
+ 
+        // ── 9. Update entity ───────────────────────────────────────────────
         details.setTotalStaffCharges(totalStaff);
         details.setTotalRoomCharges(totalRoom);
-        details.setTotalRecoveryCharges(totalRecovery);   // ← Yeh line add karo
+        details.setTotalRecoveryCharges(totalRecovery);
         details.setTotalItemCharges(totalItems);
-        details.setTotalDoctorVisitCharges(totalDoctorVisits);  // ✅ NEW
+        details.setTotalDoctorVisitCharges(totalDoctorVisits); // ✅
         details.setTotalDiscountAmount(totalDiscount);
         details.setTotalGstAmount(totalGst);
         details.setGrossAmount(grossAmount);
         details.setTotalAmount(totalAmount);
         details.setDue(due);
-
-        // BillingMaster bhi update karo
+ 
+        // BillingMaster sync
         BillingMaster billingMaster = details.getBillingMaster();
         billingMaster.setTotalAmount(totalAmount);
         billingMasterRepository.save(billingMaster);
-
+ 
         otBillingDetailsRepository.save(details);
         return mapToResponse(details);
     }
@@ -246,7 +251,9 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                 .patientExternalId(details.getPatientExternalId())
                 .totalStaffCharges(details.getTotalStaffCharges())
                 .totalRoomCharges(details.getTotalRoomCharges())
+                .totalRecoveryCharges(details.getTotalRecoveryCharges())
                 .totalItemCharges(details.getTotalItemCharges())
+                .totalDoctorVisitCharges(details.getTotalDoctorVisitCharges()) // ✅ BUG FIX
                 .totalDiscountAmount(details.getTotalDiscountAmount())
                 .totalGstAmount(details.getTotalGstAmount())
                 .grossAmount(details.getGrossAmount())
@@ -263,66 +270,79 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
     
     @Override
     public OTBillingSummaryResponse getBillingSummary(Long operationId) {
-
-        // 1. OTBillingDetails fetch
+ 
         OTBillingDetails details = otBillingDetailsRepository
                 .findByOperationExternalId(operationId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "OT Billing not found for operation: " + operationId));
-
+ 
         BillingMaster billingMaster = details.getBillingMaster();
-
-        // 2. Staff charges
+ 
+        // Staff
         List<OTStaffBillingResponse> staffList = staffBillingRepository
                 .findByOtBillingDetails(details)
                 .stream()
                 .map(otBillingMapper::mapStaff)
                 .collect(Collectors.toList());
-
         double totalStaff = staffList.stream()
                 .mapToDouble(s -> s.getTotalAmount() != null ? s.getTotalAmount() : 0.0)
                 .sum();
-
-        // 3. Room charges
+ 
+        // OT Room
         List<OTRoomBillingResponse> roomList = roomBillingRepository
                 .findAllByOtBillingDetails(details)
                 .stream()
                 .map(otBillingMapper::mapRoom)
                 .collect(Collectors.toList());
-
         double totalRoom = roomList.stream()
                 .mapToDouble(r -> r.getTotalAmount() != null ? r.getTotalAmount() : 0.0)
                 .sum();
-        
-     // 4. Recovery Room charges (NEW)
+ 
+        // Recovery Room
         OTRecoveryRoomBillingResponse recoveryResponse = null;
         double totalRecovery = 0.0;
-
         if (details.getRecoveryRoomCharges() != null) {
-        	recoveryResponse = otBillingMapper.mapRecovery(details.getRecoveryRoomCharges());
-            totalRecovery = details.getRecoveryRoomCharges().getTotalAmount() != null 
-                            ? details.getRecoveryRoomCharges().getTotalAmount() : 0.0;
+            recoveryResponse = otBillingMapper.mapRecovery(details.getRecoveryRoomCharges());
+            totalRecovery = details.getRecoveryRoomCharges().getTotalAmount() != null
+                    ? details.getRecoveryRoomCharges().getTotalAmount() : 0.0;
         }
-
-        // 4. Item charges
+ 
+        // Items
         List<OTItemBillingResponse> itemList = itemBillingRepository
                 .findByOtBillingDetails(details)
                 .stream()
                 .map(otBillingMapper::mapItem)
                 .collect(Collectors.toList());
-
         double totalItems = itemList.stream()
                 .mapToDouble(i -> i.getTotalAmount() != null ? i.getTotalAmount() : 0.0)
                 .sum();
-
-        // Group by itemType
         Map<String, Double> totalByType = itemList.stream()
                 .collect(Collectors.groupingBy(
                         i -> i.getItemType().name(),
                         Collectors.summingDouble(i -> i.getTotalAmount() != null
                                 ? i.getTotalAmount() : 0.0)));
-
-        // 5. Payments
+ 
+        // ✅ BUG FIX — Doctor Visits summary
+        List<OTDoctorVisitBillingResponse> doctorVisitList = doctorVisitBillingRepository
+                .findByOtBillingDetailsOrderByVisitTimeDesc(details)
+                .stream()
+                .map(v -> OTDoctorVisitBillingResponse.builder()
+                        .id(v.getId())
+                        .otBillingDetailsId(details.getId())
+                        .operationExternalId(details.getOperationExternalId())
+                        .doctorExternalId(v.getDoctorExternalId())
+                        .doctorName(v.getDoctorName())
+                        .visitTime(v.getVisitTime())
+                        .fees(v.getFees())
+                        .createdAt(v.getCreatedAt())
+                        .updatedAt(v.getUpdatedAt())
+                        .build())
+                .collect(Collectors.toList());
+        double totalDoctorVisits = doctorVisitList.stream()
+                .mapToDouble(v -> v.getFees() != null ? v.getFees() : 0.0)
+                .sum();
+ 
+        // Payments
         List<OTBillingSummaryResponse.PaymentEntry> payments = paymentRepository
                 .findByOtBillingDetails(details)
                 .stream()
@@ -338,8 +358,8 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                         .paidAt(p.getPaidAt())
                         .build())
                 .collect(Collectors.toList());
-
-        // 6. Refunds
+ 
+        // Refunds
         List<OTBillingSummaryResponse.RefundEntry> refunds = refundRepository
                 .findByOtBillingDetails(details)
                 .stream()
@@ -354,19 +374,16 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                         .refundedAt(r.getRefundedAt())
                         .build())
                 .collect(Collectors.toList());
-
-        // 7. Total paid — sirf SUCCESS payments
+ 
         double totalPaid = payments.stream()
                 .filter(p -> p.getStatus().equals("SUCCESS"))
                 .mapToDouble(OTBillingSummaryResponse.PaymentEntry::getAmount)
                 .sum();
-
-        // 8. Total refunded — sirf COMPLETED refunds
         double totalRefunded = refunds.stream()
                 .filter(r -> r.getRefundStatus().equals("COMPLETED"))
                 .mapToDouble(OTBillingSummaryResponse.RefundEntry::getRefundAmount)
                 .sum();
-
+ 
         return OTBillingSummaryResponse.builder()
                 .operationExternalId(operationId)
                 .operationReference(details.getOperationReference())
@@ -385,7 +402,6 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                         .totalAmount(totalRoom)
                         .rooms(roomList)
                         .build())
-             // ==================== Recovery Room Summary ====================
                 .recoveryRoomCharges(OTBillingSummaryResponse.RecoveryRoomSummary.builder()
                         .totalAmount(totalRecovery)
                         .recoveryRoom(recoveryResponse)
@@ -394,6 +410,11 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
                         .totalAmount(totalItems)
                         .totalByType(totalByType)
                         .items(itemList)
+                        .build())
+                // ✅ BUG FIX — Doctor visits summary ab response mein aayega
+                .doctorVisitCharges(OTBillingSummaryResponse.DoctorVisitChargesSummary.builder()
+                        .totalAmount(totalDoctorVisits)
+                        .visits(doctorVisitList)
                         .build())
                 .grossAmount(details.getGrossAmount())
                 .totalDiscountAmount(details.getTotalDiscountAmount())

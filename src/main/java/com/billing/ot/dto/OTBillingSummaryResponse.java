@@ -28,6 +28,7 @@ public class OTBillingSummaryResponse {
     private RoomChargesSummary roomCharges;
     private RecoveryRoomSummary recoveryRoomCharges;   // ← NEW
     private ItemChargesSummary itemCharges;
+    private DoctorVisitChargesSummary doctorVisitCharges; // ✅ BUG FIX — naya section
 
     // Totals
     private Double grossAmount;
@@ -75,6 +76,14 @@ public class OTBillingSummaryResponse {
         private Double totalAmount;
         private Map<String, Double> totalByType;     // IV_FLUID → 500.0
         private List<OTItemBillingResponse> items;
+    }
+    
+    // ✅ BUG FIX — Doctor Visit Charges Summary inner class
+    @Data
+    @Builder
+    public static class DoctorVisitChargesSummary {
+        private Double                          totalAmount;
+        private List<OTDoctorVisitBillingResponse> visits;
     }
 
     @Data
