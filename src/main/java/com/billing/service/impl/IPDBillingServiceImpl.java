@@ -286,6 +286,11 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         if ("CLOSED".equals(billing.getBillingStatus())) {
             throw new IllegalStateException("Cannot update a CLOSED bill");
         }
+        
+        // ❌ Prevent update if bill is PAUSED
+        if ("PAUSED".equalsIgnoreCase(billing.getBillingStatus())) {
+            throw new IllegalStateException("Cannot update a PAUSED bill");
+        }
 
         // ✅ Date validation
         if (request.getDischargeDate().isBefore(request.getAdmissionDate())) {
@@ -1362,4 +1367,88 @@ public class IPDBillingServiceImpl implements IPDBillingService {
         billing.setSpecialDiscountReason(request.getReason());      
     	return ipdBillingRepository.save(billing);  
     	}
+    
+    /* --------------------------------------------------------------
+    Pause Billing for Transfer
+   -------------------------------------------------------------- */
+    @Override
+    @Transactional
+    public void releaseCurrentRoom(Long admissionId) {
+
+        IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(admissionId)
+                .orElseThrow(() -> new RuntimeException("Billing not found"));
+
+        Optional<IPDRoomAllocation> activeRoomOpt =
+                ipdRoomAllocationRepository.findByIpdBillingDetailsAndReleaseDateIsNull(billing);
+
+        if (activeRoomOpt.isEmpty()) {
+            return; // already released → idempotent
+        }
+
+        IPDRoomAllocation activeRoom = activeRoomOpt.get();
+
+        // ✅ 🔥 ADD HERE (before setting releaseDate)
+        LocalDate start = activeRoom.getAllocationDate().toLocalDate();
+        LocalDate end = LocalDate.now();
+
+        long days = Math.max(1, ChronoUnit.DAYS.between(start, end) + 1);
+
+        double charges = activeRoom.getBedPricePerDay() * days;
+
+        activeRoom.setDaysAdmitted(days);
+        activeRoom.setTotalRoomCharges((double) Math.round(charges));
+
+        // FINAL STEP
+        activeRoom.setReleaseDate(LocalDateTime.now());
+
+        ipdRoomAllocationRepository.save(activeRoom);
+    }
+    
+    /* --------------------------------------------------------------
+    Pause Billing for Transfer
+   -------------------------------------------------------------- */
+    @Override
+    @Transactional
+    public void pauseBill(Long admissionId) {
+
+        /* ================= FETCH BILLING ================= */
+        IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(admissionId)
+                .orElseThrow(() -> new RuntimeException("Billing not found"));
+
+        /* ================= ALREADY PAUSED? ================= */
+        if ("PAUSED".equalsIgnoreCase(billing.getBillingStatus())) {
+            return; // idempotent
+        }
+
+        /* ================= RELEASE ACTIVE ROOM ================= */
+        Optional<IPDRoomAllocation> activeRoomOpt =
+                ipdRoomAllocationRepository.findByIpdBillingDetailsAndReleaseDateIsNull(billing);
+
+        if (activeRoomOpt.isPresent()) {
+
+            IPDRoomAllocation activeRoom = activeRoomOpt.get();
+
+            // 🔥 calculate days + charges BEFORE release
+            LocalDate start = activeRoom.getAllocationDate().toLocalDate();
+            LocalDate end = LocalDate.now();
+
+            long days = Math.max(1, ChronoUnit.DAYS.between(start, end) + 1);
+
+            double charges = activeRoom.getBedPricePerDay() * days;
+
+            activeRoom.setDaysAdmitted(days);
+            activeRoom.setTotalRoomCharges(Math.round(charges * 100.0) / 100.0);
+
+            activeRoom.setReleaseDate(LocalDateTime.now());
+
+            ipdRoomAllocationRepository.save(activeRoom);
+        }
+
+        /* ================= UPDATE BILL STATUS ================= */
+        billing.setBillingStatus("PAUSED");
+        billing.setUpdatedAt(LocalDateTime.now());
+
+        ipdBillingRepository.save(billing);
+    }
+    
 }

@@ -145,6 +145,23 @@ public class BillingController {
 	    return ResponseEntity.ok(updated);
 	}
 	
+//	Set Release time for the Admissio Room(Can be used for Other Purpose As well!)
+	@PutMapping("/ipd/{admissionId}/release-room")
+	public ResponseEntity<String> releaseRoom(@PathVariable Long admissionId) {
+
+	    ipdBillingService.releaseCurrentRoom(admissionId);
+
+	    return ResponseEntity.ok("Room released successfully");
+	}
+	
+//	Pause Billing for Transfer Purpose(Can be used for Other Purpose As well!)
+	@PutMapping("/ipd/pause-bill/{admissionId}")
+	public ResponseEntity<Void> pauseBill(@PathVariable Long admissionId) {
+
+	    ipdBillingService.pauseBill(admissionId);
+	    return ResponseEntity.ok().build();
+	}
+	
 //	OPD Controller---------------
 	
 	@PostMapping("/opd/generate-bill")

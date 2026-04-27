@@ -30,6 +30,13 @@ public interface IPDBillingService {
 //    Special Discount
     IPDBillingDetails specialDiscounts(SpecialDiscountRequestDTO request);
 	IPDServiceUsage changeServiceDailyStatus(ChangeIsDailyRequestDTO request);
+	
+	//Set Release time for IPD admission(For transfer Purpose)
+	void releaseCurrentRoom(Long admissionId);
+	
+	//Pause Billing For Discount!
+	void pauseBill(Long admissionId);
+
     
 //    CreateIpdBillingAccountResponse createBillingAccount(CreateIpdBillingAccountRequest request);
 }
