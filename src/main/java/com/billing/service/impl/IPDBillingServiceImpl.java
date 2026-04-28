@@ -3,7 +3,7 @@ package com.billing.service.impl;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -1139,6 +1139,11 @@ public class IPDBillingServiceImpl implements IPDBillingService {
     public List<IPDServiceUsage> addServices(AddServicesRequest request) {
         IPDBillingDetails billing = ipdBillingRepository.findById(request.getIpdBillingId())
                 .orElseThrow(() -> new RuntimeException("IPD Billing not found"));
+        
+        // ❌ Prevent update if bill is PAUSED
+        if ("PAUSED".equalsIgnoreCase(billing.getBillingStatus())) {
+            throw new IllegalStateException("Cannot Add Services to a PAUSED bill");
+        }
 
         List<IPDServiceUsage> newUsages = new ArrayList<>();
         double newServiceTotalBeforeGst = 0.0;
@@ -1443,9 +1448,44 @@ public class IPDBillingServiceImpl implements IPDBillingService {
 
             ipdRoomAllocationRepository.save(activeRoom);
         }
+        
+        /* ================= STOP DAILY SERVICES ================= */
+        List<IPDServiceUsage> services =
+                ipdServiceUsageRepository.findByIpdBillingDetailsId(billing.getId());
+
+        if (!services.isEmpty()) {
+            for (IPDServiceUsage service : services) {
+                if (service.getIsDaily() == IsDaily.YES) {
+                    service.setIsDaily(IsDaily.NO);
+                }
+            }
+
+            ipdServiceUsageRepository.saveAll(services);
+        }
 
         /* ================= UPDATE BILL STATUS ================= */
         billing.setBillingStatus("PAUSED");
+        billing.setUpdatedAt(LocalDateTime.now());
+
+        ipdBillingRepository.save(billing);
+    }
+    
+    
+    @Override
+    @Transactional
+    public void resumeBill(Long admissionId) {
+
+        /* ================= FETCH BILLING ================= */
+        IPDBillingDetails billing = ipdBillingRepository.findByAdmissionId(admissionId)
+                .orElseThrow(() -> new RuntimeException("Billing not found"));
+
+        /* ================= ALREADY ACTIVE? ================= */
+        if ("ACTIVE".equalsIgnoreCase(billing.getBillingStatus())) {
+            return; // idempotent
+        }
+
+        /* ================= UPDATE BILL STATUS ================= */
+        billing.setBillingStatus("ACTIVE");
         billing.setUpdatedAt(LocalDateTime.now());
 
         ipdBillingRepository.save(billing);

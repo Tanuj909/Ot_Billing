@@ -162,6 +162,14 @@ public class BillingController {
 	    return ResponseEntity.ok().build();
 	}
 	
+//	Resume Billing for Transfer Purpose(Can be used for Other Purpose As well!)
+	@PutMapping("/ipd/resume-bill/{admissionId}")
+	public ResponseEntity<Void> resumeBill(@PathVariable Long admissionId) {
+
+	    ipdBillingService.resumeBill(admissionId);
+	    return ResponseEntity.ok().build();
+	}
+	
 //	OPD Controller---------------
 	
 	@PostMapping("/opd/generate-bill")

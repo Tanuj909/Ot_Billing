@@ -36,6 +36,7 @@ public interface IPDBillingService {
 	
 	//Pause Billing For Discount!
 	void pauseBill(Long admissionId);
+	void resumeBill(Long admissionId);
 
     
 //    CreateIpdBillingAccountResponse createBillingAccount(CreateIpdBillingAccountRequest request);
