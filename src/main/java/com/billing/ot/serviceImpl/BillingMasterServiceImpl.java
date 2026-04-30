@@ -199,21 +199,21 @@ public class BillingMasterServiceImpl implements BillingMasterService {
         // Scenario: Patient already has a PENDING / PARTIALLY_PAID OT billing →
         //           block new entry until that billing is closed (PAID) or cancelled.
         // If previous billing is PAID or CANCELLED → allow new entry freely.
-        boolean activeEntryExists =
-                billingMasterRepository
-                        .existsByPatientExternalIdAndModuleTypeAndHospitaExternallIdAndPaymentStatusNotIn(
-                                request.getPatientExternalId(),
-                                request.getModuleType(),
-                                request.getHospitalExternalId(),
-                                TERMINAL_STATUSES);
-
-        if (activeEntryExists) {
-            throw new ValidationException(
-                    "An active billing already exists for patient ID " +
-                    request.getPatientExternalId() +
-                    " under module '" + request.getModuleType() + "'. " +
-                    "Please close or cancel the existing billing before creating a new one.");
-        }
+//        boolean activeEntryExists =
+//                billingMasterRepository
+//                        .existsByPatientExternalIdAndModuleTypeAndHospitaExternallIdAndPaymentStatusNotIn(
+//                                request.getPatientExternalId(),
+//                                request.getModuleType(),
+//                                request.getHospitalExternalId(),
+//                                TERMINAL_STATUSES);
+//
+//        if (activeEntryExists) {
+//            throw new ValidationException(
+//                    "An active billing already exists for patient ID " +
+//                    request.getPatientExternalId() +
+//                    " under module '" + request.getModuleType() + "'. " +
+//                    "Please close or cancel the existing billing before creating a new one.");
+//        }
 
         // ── Build and persist ─────────────────────────────────────────────────────────────
         BillingMaster billing = BillingMaster.builder()

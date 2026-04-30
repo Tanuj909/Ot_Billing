@@ -185,26 +185,32 @@ public class OTBillingDetailsServiceImpl implements OTBillingDetailsService {
         double due = totalAmount - (details.getAdvancePaid() != null ? details.getAdvancePaid() : 0.0);
  
         // ── 9. Update entity ───────────────────────────────────────────────
-        details.setTotalStaffCharges(totalStaff);
-        details.setTotalRoomCharges(totalRoom);
-        details.setTotalRecoveryCharges(totalRecovery);
-        details.setTotalItemCharges(totalItems);
-        details.setTotalDoctorVisitCharges(totalDoctorVisits); // ✅
-        details.setTotalDiscountAmount(totalDiscount);
-        details.setTotalGstAmount(totalGst);
-        details.setGrossAmount(grossAmount);
-        details.setTotalAmount(totalAmount);
-        details.setDue(due);
+        details.setTotalStaffCharges(round(totalStaff));
+        details.setTotalRoomCharges(round(totalRoom));
+        details.setTotalRecoveryCharges(round(totalRecovery));
+        details.setTotalItemCharges(round(totalItems));
+        details.setTotalDoctorVisitCharges(round(totalDoctorVisits)); // ✅
+        details.setTotalDiscountAmount(round(totalDiscount));
+        details.setTotalGstAmount(round(totalGst));
+        details.setGrossAmount(round(grossAmount));
+        details.setTotalAmount(round(totalAmount));
+        details.setDue(round(due));
  
         // BillingMaster sync
         BillingMaster billingMaster = details.getBillingMaster();
-        billingMaster.setTotalAmount(totalAmount);
+        billingMaster.setTotalAmount(round(totalAmount));
         billingMasterRepository.save(billingMaster);
  
         otBillingDetailsRepository.save(details);
         return mapToResponse(details);
     }
 
+    
+    // ---------------------------------------- Function To Round Off the Values ---------------------------------------- //
+    private double round(double value) {
+        return Math.round(value);
+    }
+    
     // ---------------------------------------- Close ---------------------------------------- //
 
     @Transactional

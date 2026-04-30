@@ -57,6 +57,11 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
         }
     }
 
+    // Helper Method -- round of the Hours
+    private double roundHours(double value) {
+        return Math.round(value * 100.0) / 100.0; // 2 decimal
+    }
+    
     // ---------------------------------------- Create ---------------------------------------- //
 
     @Transactional
@@ -227,7 +232,8 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
                 .startTime(room.getStartTime())
                 .endTime(room.getEndTime())
                 .durationMinutes(room.getDurationMinutes())
-                .totalHours(room.getTotalHours())
+//                .totalHours(room.getTotalHours())
+                .totalHours(roundHours(room.getTotalHours()))
                 .ratePerHour(room.getRatePerHour())
                 .baseAmount(room.getBaseAmount())
                 .discountPercent(room.getDiscountPercent())
