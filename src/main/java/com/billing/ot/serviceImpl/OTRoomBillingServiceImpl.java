@@ -232,8 +232,11 @@ public class OTRoomBillingServiceImpl implements OTRoomBillingService {
                 .startTime(room.getStartTime())
                 .endTime(room.getEndTime())
                 .durationMinutes(room.getDurationMinutes())
-//                .totalHours(room.getTotalHours())
-                .totalHours(roundHours(room.getTotalHours()))
+                .totalHours(
+                	    room.getTotalHours() != null 
+                	        ? roundHours(room.getTotalHours()) 
+                	        : 0.0
+                	)
                 .ratePerHour(room.getRatePerHour())
                 .baseAmount(room.getBaseAmount())
                 .discountPercent(room.getDiscountPercent())
