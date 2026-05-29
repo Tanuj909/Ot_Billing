@@ -52,6 +52,10 @@ public class BillingMaster {
 	private Long labOrderId;
 	
     private Long otOperationId;         // 👈 NEW — OT system ka operationId
+    
+    /** ICU admission ID — set when moduleType = "ICU" */
+    @Column(name = "icu_admission_id")
+    private Long icuAdmissionId;
 	
 //	@ManyToOne
 //	@JoinColumn(name = "patient_id")
